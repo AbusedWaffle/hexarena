@@ -2,6 +2,7 @@
 import { HEX_PX, HEX_DIST, DIRS, key, hexToPixel, pixelToHex, hexCorners } from './hex.js';
 export const TICK_HZ = 20, DT = 1 / TICK_HZ;
 const PLAYER_RADIUS_HEX = 0.2;
+const CRATE_WARN_SEC = 1.5; // varsel før kasse-respawn (matcher FX.crateRespawn)
 
 export function createWorld(map, classes) {
   const tiles = new Map();
@@ -169,9 +170,14 @@ export function step(w, inputs) {
   for (const t of w.tiles.values()) {
     if (!t.wasCrate || t.type !== 'floor') continue;
     t.respawnLeft -= DT; if (t.respawnLeft > 0) continue;
-    const c = hexToPixel(t.q, t.r);
-    if (w.players.some(p => p.alive && Math.hypot(p.x - c.x, p.y - c.y) < blockPx)) continue;
-    t.type = 'crate'; t.hp = t.maxHp; t.wasCrate = false;
+    const c = hexToPixel(t.q, t.r), blocked = w.players.some(p => p.alive && Math.hypot(p.x - c.x, p.y - c.y) < blockPx);
+    if (t.warnLeft == null) {          // fase 1: varsel, når pladsen er fri
+      if (!blocked) { t.warnLeft = CRATE_WARN_SEC; w.events.push({ type: 'crateRespawnWarning', q: t.q, r: t.r, sec: CRATE_WARN_SEC }); }
+      continue;
+    }
+    t.warnLeft -= DT; if (t.warnLeft > 0) continue;
+    if (blocked) { t.warnLeft = null; w.events.push({ type: 'crateRespawnCancelled', q: t.q, r: t.r }); continue; } // nogen gik ind i spøgelset: prøv igen
+    t.type = 'crate'; t.hp = t.maxHp; t.wasCrate = false; t.warnLeft = null;
     w.events.push({ type: 'crateRespawned', q: t.q, r: t.r });
   }
 }
