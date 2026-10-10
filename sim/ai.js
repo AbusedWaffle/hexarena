@@ -160,9 +160,46 @@ export function createAI(w, cfg, seed = 1) {
         if (b.state === 'retreat' && p.charges > 0 && dist(p, b.target) <= wp.range * U * 0.8 && b.seenSince != null && (now - b.seenSince) * 1000 >= b.diff.reactionMs) f.fire = true;
       } else if (Math.hypot(f.move.x, f.move.y) > 0) f.aim = { ...f.move };
     }
+    if (p.abilityCooldownLeft === 0) useAbility(b, p, f, t);
     b.prevT = t ? { id: t.id, x: t.x, y: t.y } : null;
     b.move = f.move; b.aim = f.aim;
     return f;
+  }
+
+  // Ability-regler pr. klasse. Sætter f.ability (og evt. aim/move) i samme InputFrame; skyder ikke i samme tick.
+  function useAbility(b, p, f, t) {
+    const ab = w.classes[p.cls].ability; if (!ab) return;
+    const now = w.tick * DT, hpf = p.hp / p.maxHp, reacted = t && b.seenSince != null && (now - b.seenSince) * 1000 >= b.diff.reactionMs;
+    const use = (aim, move) => { f.ability = true; f.fire = false; if (aim) f.aim = aim; if (move) f.move = move; };
+    switch (ab.id) {
+      case 'grenade': { // 2+ fjender klumpet, mål bag cover (husket), eller mål kan dræbes af granaten
+        const tg = t || (b.mem && w.players.find(q => q.id === b.mem.id && q.alive)), range = ab.throwRange * U;
+        if (!tg || dist(p, tg) > range) return;
+        if (!t && !(b.mem && now - b.mem.t < 1.5)) return;
+        const clump = enemiesOf(p).filter(e => dist(e, tg) <= ab.radius * U).length >= 2;
+        if (clump || !t || tg.hp <= ab.damage) { const d = dist(p, tg), n = norm({ x: tg.x - p.x, y: tg.y - p.y }), fr = Math.max(0.05, Math.min(1, d / range)); use({ x: n.x * fr, y: n.y * fr }); }
+        return;
+      }
+      case 'focus': // aktiveres lige før et skud, når målet ikke dør af et normalt skud
+        if (b.state === 'engage' && reacted && p.charges > 0 && p.focusLeft === 0 && t.hp > w.classes[p.cls].weapon.damage) use();
+        return;
+      case 'dash': {
+        const threat = t || b.mem; if (!threat) return;
+        const away = norm({ x: p.x - threat.x, y: p.y - threat.y }), d = dist(p, threat), rng = w.classes[p.cls].weapon.range * U;
+        if (hpf < 0.4 && d < rng) use(null, away);                                           // flygt
+        else if (t && hpf > 0.6 && d > rng * 0.9 && d < rng + ab.distance * U * 0.8) use(null, { x: -away.x, y: -away.y }); // luk afstanden
+        return;
+      }
+      case 'deploy_crate': // under beskydning uden cover: kasse mod truslen
+        if (t && now - (p.lastDamageAt ?? -1e9) < 0.6 && hasLineOfSight(w, p, t) && !(p.deployedCrate && p.deployedCrate.type === 'crate' && dist(p, center(p.deployedCrate)) < 2 * U))
+          use(norm({ x: t.x - p.x, y: t.y - p.y }));
+        return;
+      case 'heal_zone': { // 2+ sårede holdkammerater (inkl. sig selv) i zonen
+        const hurt = w.players.filter(q => q.alive && q.team === p.team && dist(q, p) <= ab.radius * U * 0.8 && q.hp / q.maxHp < 0.7).length;
+        if (hurt >= 2 || (hpf < 0.4 && t)) use();
+        return;
+      }
+    }
   }
 
   // Kaldes én gang pr. tick før step(). Læser seneste tick's events (kasser ændret => ny sti).
