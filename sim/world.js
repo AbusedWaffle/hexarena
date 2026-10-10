@@ -20,7 +20,18 @@ export function addPlayer(w, { team, cls, id }) {
 }
 
 function spawn(w, p) {
-  const list = w.map.spawns[p.team], s = list[(w.players.indexOf(p) + w.tick) % list.length], px = hexToPixel(s.q, s.r);
+  // Ledig spawn længst fra synlige fjender (fjender uden synslinje tæller svagere)
+  const list = w.map.spawns[p.team]; let s = list[0], best = -Infinity;
+  for (const c of list) {
+    const cp = hexToPixel(c.q, c.r); let score = 0;
+    for (const o of w.players) if (o !== p && o.alive) {
+      const d = Math.hypot(o.x - cp.x, o.y - cp.y);
+      if (o.team === p.team) { if (d < p.radius * 3) score -= 1e6; }
+      else score -= (hasLineOfSight(w, cp, o) ? 3 : 1) * 1e5 / Math.max(d, 1);
+    }
+    if (score > best) { best = score; s = c; }
+  }
+  const px = hexToPixel(s.q, s.r);
   Object.assign(p, { x: px.x, y: px.y, hp: p.maxHp, alive: true, spawnShieldLeft: w.classes._match.spawnShieldSec, charges: w.classes[p.cls].weapon.charges, chargeProgress: 0, salvo: null });
   w.events.push({ type: 'respawn', id: p.id });
 }
