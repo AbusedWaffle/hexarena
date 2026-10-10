@@ -4,16 +4,23 @@ import { TILE_PX } from '../sim/grid.js';
 import { drawSquareMap } from '../art/squareMap.js';
 import { createWorld, addPlayer, step, snapshot, raycast, DT } from '../sim/world.js';
 import { createDevInput } from './devInput.js';
+import { createAI } from '../sim/ai.js';
 
-const [map, classes] = await Promise.all(['data/map_paintyard_sq_01.json', 'data/classes.square.json'].map(u => fetch(u).then(r => r.json())));
+const [map, classes, aiCfg] = await Promise.all(['data/map_paintyard_sq_01.json', 'data/classes.square.json', 'data/ai.json'].map(u => fetch(u).then(r => r.json())));
+// URL: ?diff=easy|normal|hard  &red=3 (antal røde bots)  &blue=0 (blå holdkammerater)  &aidebug=1
+const QS = new URLSearchParams(location.search), AI_DIFF = QS.get('diff') || 'normal', AI_DEBUG = QS.has('aidebug');
 const hexStr = (c) => '#' + c.toString(16).padStart(6, '0');
 
 class Arena extends Phaser.Scene {
   create() {
     this.world = createWorld(map, classes);
     this.me = addPlayer(this.world, { team: 'blue', cls: 'Assault', id: 'me' });
-    // Placeholder-mål indtil AI er koblet på: røde Assaults, der strafer frem og tilbage
-    this.dummies = [0, 1, 2].map(i => addPlayer(this.world, { team: 'red', cls: 'Assault', id: 'dummy' + i }));
+    // AI-bots på de øvrige pladser (sim/ai.js). Bots giver samme InputFrame som en spiller.
+    this.ai = createAI(this.world, aiCfg, Date.now() & 0xffff);
+    const order = ['Assault', 'Sniper', 'Scout', 'Engineer', 'Support'];
+    const nRed = Math.min(4, Number(QS.get('red') ?? 3)), nBlue = Math.min(3, Number(QS.get('blue') ?? 0));
+    for (let i = 0; i < nRed; i++) this.ai.addBot(addPlayer(this.world, { team: 'red', cls: order[i % 5], id: 'botR' + i }).id, AI_DIFF);
+    for (let i = 0; i < nBlue; i++) this.ai.addBot(addPlayer(this.world, { team: 'blue', cls: order[(i + 1) % 5], id: 'botB' + i }).id, AI_DIFF);
     this.prev = this.cur = snapshot(this.world); this.acc = 0;
     this.staticG = this.add.graphics(); this.drawMap();
     this.g = this.add.graphics(); this.fxG = this.add.graphics(); this.ghosts = new Map(); this.pops = [];
@@ -36,8 +43,7 @@ class Arena extends Phaser.Scene {
     let redraw = false;
     while (this.acc >= DT) {
       this.acc -= DT;
-      const inputs = { me: this.input_.frame() };
-      this.dummies.forEach((d, i) => { inputs[d.id] = { move: { x: 0, y: Math.sin(this.t * 1.3 + i * 2) }, aim: null, fire: false, ability: false }; });
+      const inputs = { ...this.ai.frames(), me: this.input_.frame() };
       step(this.world, inputs);
       this.prev = this.cur; this.cur = snapshot(this.world);
       for (const e of this.cur.events) {
@@ -83,9 +89,21 @@ class Arena extends Phaser.Scene {
     this.sparks = this.sparks.filter(s => now - s.born < FX.hitSpark.ms);
     for (const s of this.sparks) { const k = (now - s.born) / 1000; this.fxG.fillStyle(s.c, 1 - (now - s.born) / FX.hitSpark.ms).fillCircle(s.x + s.vx * k, s.y + s.vy * k, FX.hitSpark.size); }
     this.drawDamageNumbers(now);
+    if (AI_DEBUG) this.drawAIDebug();
     const m = this.cur.match, me = this.cur.players.find(p => p.id === 'me'), mm = Math.floor(m.timeLeft / 60), ss = String(Math.floor(m.timeLeft % 60)).padStart(2, '0');
     this.hud.setText(m.over ? `KAMP SLUT  ${m.score.blue} – ${m.score.red}` : `${m.score.blue}   ${mm}:${ss}   ${m.score.red}`);
     this.hud2.setText(me.alive ? `HP ${me.hp}/${me.maxHp}   Ladninger ${me.charges}` : `Respawn om ${Math.max(0, me.respawnLeft).toFixed(1)} s`);
+  }
+  drawAIDebug() { // sti, mål og tilstand pr. bot (?aidebug=1)
+    const g = this.fxG; this.aiTexts ??= new Map();
+    for (const d of this.ai.debug()) {
+      const p = this.world.players.find(q => q.id === d.id); let t = this.aiTexts.get(d.id);
+      if (!t) { t = this.add.text(0, 0, '', { fontSize: 11, color: '#9fe' }).setOrigin(0.5).setDepth(6); this.aiTexts.set(d.id, t); }
+      t.setVisible(p.alive).setText(d.state).setPosition(p.x, p.y + p.radius + 16);
+      if (!p.alive) continue;
+      g.lineStyle(1, 0x9fffe0, 0.5); let a = p; for (const n of d.path) { const b = { x: (n.x + 0.5) * TILE_PX, y: (n.y + 0.5) * TILE_PX }; g.lineBetween(a.x, a.y, b.x, b.y); a = b; }
+      const tg = d.target && this.world.players.find(q => q.id === d.target); if (tg) g.lineStyle(1, 0xffe27a, 0.6).lineBetween(p.x, p.y, tg.x, tg.y);
+    }
   }
   drawDamageNumbers(now) {
     const c = FX.damageNumber; this.dmgTexts ??= new Map();

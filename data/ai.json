@@ -1,0 +1,31 @@
+{
+  "_note": "AI-sværhedsgrader. reactionMs = tid fra en fjende bliver synlig til første skud. aimErrorDeg = max sigtefejl. leadTarget 0..1 = hvor meget der sigtes foran et mål i bevægelse. coverBias 0..1 = sandsynlighed for at søge cover, når den er tom for ladninger eller såret. flankChance = sandsynlighed for at gå udenom i stedet for direkte på. thinkHz = beslutninger pr. sekund (bevægelse/sigte opdateres hvert tick).",
+  "thinkHz": 5,
+  "retreatHpFrac": 0.3,
+  "coverHpFrac": 0.55,
+  "preferredRangeFrac": 0.6,
+  "memorySec": 3,
+  "easy": {
+    "reactionMs": 600,
+    "aimErrorDeg": 14,
+    "leadTarget": 0.0,
+    "coverBias": 0.2,
+    "flankChance": 0.0
+  },
+  "normal": {
+    "reactionMs": 350,
+    "aimErrorDeg": 8,
+    "leadTarget": 0.5,
+    "coverBias": 0.5,
+    "flankChance": 0.2
+  },
+  "hard": {
+    "reactionMs": 200,
+    "aimErrorDeg": 4,
+    "leadTarget": 1.0,
+    "coverBias": 0.8,
+    "flankChance": 0.4
+  },
+  "retreatMaxSec": 4,
+  "coverMaxSec": 3
+}
