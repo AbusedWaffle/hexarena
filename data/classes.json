@@ -5,7 +5,7 @@
     "speed": 3.0,
     "shape": "assault",
     "weapon": {
-      "damage": 14,
+      "damage": 12,
       "charges": 3,
       "rechargeSec": 1.2,
       "shotsPerCharge": 4,
@@ -135,9 +135,11 @@
     "killTarget": 15,
     "respawnSec": 3,
     "spawnShieldSec": 1.5,
-    "crateHp": 100,
+    "crateHp": 150,
     "maxPlayers": 8,
-    "maxPerTeam": 4
+    "maxPerTeam": 4,
+    "crateRespawnSec": 25,
+    "crateRespawnBlockRadius": 1
   },
   "_ai": {
     "maxRetreatingPerTeam": 1
