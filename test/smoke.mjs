@@ -1,5 +1,7 @@
 // Integrations-smoke-test: 4 mod 4, alle klasser, tilfældige inputs, hele kampen headless.
 import fs from 'node:fs';
+// Seedet Math.random, så en fejlende seed altid kan genskabes (sim/ bruger Math.random til spredning)
+let ms = Number(process.argv[2] ?? 1) || 1; Math.random = () => (ms = (ms * 48271) % 2147483647) / 2147483647;
 const { createWorld, addPlayer, step, snapshot, tileAt, isBlocking } = await import('../sim/world.js');
 const map = JSON.parse(fs.readFileSync(new URL('../data/map_paintyard_sq_01.json', import.meta.url)));
 const classes = JSON.parse(fs.readFileSync(new URL('../data/classes.square.json', import.meta.url)));

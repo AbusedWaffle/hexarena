@@ -26,6 +26,7 @@ function spawn(w, p) {
   // Ledig spawn længst fra synlige fjender (fjender uden synslinje tæller svagere)
   const list = w.map.spawns[p.team]; let s = list[0], best = -Infinity;
   for (const c of list) {
+    if (isBlocking(w.tiles.get(key(c.x, c.y)))) continue; // aldrig spawne inde i en (Engineer-)kasse
     const cp = tileToPixel(c.x, c.y); let score = 0;
     for (const o of w.players) if (o !== p && o.alive) {
       const d = Math.hypot(o.x - cp.x, o.y - cp.y);
@@ -39,6 +40,7 @@ function spawn(w, p) {
   w.events.push({ type: 'respawn', id: p.id });
 }
 
+const isSpawnTile = (w, x, y) => w.map.spawns.blue.concat(w.map.spawns.red).some(s => s.x === x && s.y === y);
 export const isBlocking = (t) => t && (t.type === 'wall' || t.type === 'crate');
 export function tileAt(w, px, py) { const t = pixelToTile(px, py); return w.tiles.get(key(t.x, t.y)); }
 export { tileToPixel, pixelToTile };
@@ -200,6 +202,7 @@ function useAbility(w, p, inp) {
     case 'deploy_crate': {
       const n = norm(inp.aim || p.aim), cx = p.x + n.x * (p.radius + (ab.placeRange - 0.5) * U + U * 0.5), cy = p.y + n.y * (p.radius + (ab.placeRange - 0.5) * U + U * 0.5);
       const t = tileAt(w, cx, cy); if (!t || t.type !== 'floor' || t.warnLeft != null) return false;
+      if (isSpawnTile(w, t.x, t.y)) return false; // ingen kasser på spawn-punkter
       const x0 = t.x * U, y0 = t.y * U;
       if (w.players.some(q => q.alive && Math.hypot(q.x - Math.max(x0, Math.min(q.x, x0 + U)), q.y - Math.max(y0, Math.min(q.y, y0 + U))) < q.radius)) return false; // ingen fanget i kassen
       if (p.deployedCrate && p.deployedCrate.type === 'crate') { const o = p.deployedCrate; o.type = 'floor'; o.hp = 0; o.deployedBy = null; w.events.push({ type: 'crateBroken', x: o.x, y: o.y }); }
