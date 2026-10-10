@@ -25,7 +25,7 @@
       "throwRange": 5,
       "fuseSec": 0.6
     },
-    "radius": 0.2
+    "radius": 0.35
   },
   "Sniper": {
     "hp": 70,
@@ -51,7 +51,7 @@
       "pierce": true,
       "durationSec": 5
     },
-    "radius": 0.2
+    "radius": 0.35
   },
   "Engineer": {
     "hp": 110,
@@ -76,7 +76,7 @@
       "crateHp": 80,
       "placeRange": 1
     },
-    "radius": 0.2
+    "radius": 0.35
   },
   "Scout": {
     "hp": 75,
@@ -101,7 +101,7 @@
       "distance": 3,
       "invulnSec": 0.25
     },
-    "radius": 0.2
+    "radius": 0.35
   },
   "Support": {
     "hp": 90,
@@ -127,7 +127,7 @@
       "radius": 1.5,
       "durationSec": 4
     },
-    "radius": 0.2
+    "radius": 0.35
   },
   "_match": {
     "mode": "tdm",
