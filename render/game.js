@@ -47,7 +47,7 @@ class Arena extends Phaser.Scene {
       step(this.world, inputs);
       this.prev = this.cur; this.cur = snapshot(this.world);
       for (const e of this.cur.events) {
-        if (e.type === 'crateDamaged' || e.type === 'crateBroken') redraw = true;
+        if (e.type === 'crateDamaged' || e.type === 'crateBroken' || e.type === 'crateRespawned') redraw = true;
         if (e.type === 'shot' && e.hitscan) this.trails.push({ ...e, born: this.time.now });
         if (e.type === 'hit') {
           const d = this.dmg.get(e.id), now = this.time.now;

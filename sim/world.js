@@ -5,7 +5,7 @@ const PLAYER_RADIUS_HEX = 0.2;
 
 export function createWorld(map, classes) {
   const tiles = new Map();
-  for (const t of map.tiles) tiles.set(key(t.q, t.r), { q: t.q, r: t.r, type: t.type, hp: t.type === 'crate' ? (t.hp ?? classes._match.crateHp) : 0, maxHp: t.hp ?? classes._match.crateHp });
+  for (const t of map.tiles) tiles.set(key(t.q, t.r), { q: t.q, r: t.r, type: t.type, hp: t.type === 'crate' ? (classes._match.crateHp ?? t.hp) : 0, maxHp: classes._match.crateHp ?? t.hp });
   return { map, classes, tiles, players: [], projectiles: [], events: [], tick: 0,
     match: { score: { blue: 0, red: 0 }, timeLeft: classes._match.durationSec, over: false }, nextId: 1 };
 }
@@ -123,7 +123,7 @@ function applyHit(w, ownerId, hit, damage) {
   } else if (hit.tile && hit.tile.type === 'crate') {
     const t = w.tiles.get(key(hit.tile.q, hit.tile.r));
     t.hp -= damage; w.events.push({ type: 'crateDamaged', q: t.q, r: t.r, hp: t.hp, maxHp: t.maxHp });
-    if (t.hp <= 0) { t.type = 'floor'; t.hp = 0; w.events.push({ type: 'crateBroken', q: t.q, r: t.r }); }
+    if (t.hp <= 0) { t.type = 'floor'; t.hp = 0; t.wasCrate = true; t.respawnLeft = w.classes._match.crateRespawnSec ?? Infinity; w.events.push({ type: 'crateBroken', q: t.q, r: t.r }); }
   }
 }
 function endMatch(w) { if (!w.match.over) { w.match.over = true; const s = w.match.score; w.events.push({ type: 'matchOver', winner: s.blue === s.red ? 'draw' : s.blue > s.red ? 'blue' : 'red' }); } }
@@ -164,6 +164,16 @@ export function step(w, inputs) {
     else { b.x += b.dir.x * d; b.y += b.dir.y * d; b.left -= d; }
   }
   w.projectiles = w.projectiles.filter(b => b.left > 0);
+  // Kasse-respawn: kun når ingen spiller står inden for crateRespawnBlockRadius hex
+  const blockPx = ((w.classes._match.crateRespawnBlockRadius ?? 1) + 0.5) * HEX_DIST;
+  for (const t of w.tiles.values()) {
+    if (!t.wasCrate || t.type !== 'floor') continue;
+    t.respawnLeft -= DT; if (t.respawnLeft > 0) continue;
+    const c = hexToPixel(t.q, t.r);
+    if (w.players.some(p => p.alive && Math.hypot(p.x - c.x, p.y - c.y) < blockPx)) continue;
+    t.type = 'crate'; t.hp = t.maxHp; t.wasCrate = false;
+    w.events.push({ type: 'crateRespawned', q: t.q, r: t.r });
+  }
 }
 
 // Snapshot til render, HUD og netværk (samme felter overalt)
