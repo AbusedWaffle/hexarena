@@ -14,7 +14,7 @@ const hexStr = (c) => '#' + c.toString(16).padStart(6, '0');
 class Arena extends Phaser.Scene {
   create() {
     this.world = createWorld(map, classes);
-    this.me = addPlayer(this.world, { team: 'blue', cls: 'Assault', id: 'me' });
+    this.me = addPlayer(this.world, { team: 'blue', cls: classes[QS.get('cls')] ? QS.get('cls') : 'Assault', id: 'me' });
     // AI-bots på de øvrige pladser (sim/ai.js). Bots giver samme InputFrame som en spiller.
     this.ai = createAI(this.world, aiCfg, Date.now() & 0xffff);
     const order = ['Assault', 'Sniper', 'Scout', 'Engineer', 'Support'];
@@ -30,7 +30,7 @@ class Arena extends Phaser.Scene {
     this.trails = []; this.dmg = new Map(); this.sparks = [];
     this.hud = this.add.text(640, 16, '', { fontFamily: 'Roboto Mono, monospace', fontSize: 28, color: hexStr(PALETTE.score) }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(10);
     this.hud2 = this.add.text(16, 680, '', { fontFamily: 'Roboto Mono, monospace', fontSize: 18, color: hexStr(PALETTE.text) }).setScrollFactor(0).setDepth(10);
-    this.help = this.add.text(16, 56, 'WASD bevæg · hold mus = sigt, slip = skyd · mellemrum = auto-aim\nMobil: venstre halvdel = bevæg, højre: tap = auto, træk+slip = manuel', { fontSize: 13, color: '#8a93b5' }).setScrollFactor(0).setDepth(10);
+    this.help = this.add.text(16, 56, 'WASD bevæg · hold mus = sigt, slip = skyd · mellemrum = auto-aim · E = ability (?cls=Sniper|Engineer|Scout|Support)\nMobil: venstre halvdel = bevæg, højre: tap = auto, træk+slip = manuel', { fontSize: 13, color: '#8a93b5' }).setScrollFactor(0).setDepth(10);
     this.t = 0;
   }
   drawMap() {
@@ -47,6 +47,8 @@ class Arena extends Phaser.Scene {
       step(this.world, inputs);
       this.prev = this.cur; this.cur = snapshot(this.world);
       for (const e of this.cur.events) {
+        if (e.type === 'explosion') (this.booms ||= []).push({ ...e, born: this.time.now });
+        if (e.type === 'crateDeployed') redraw = true;
         if (e.type === 'crateDamaged' || e.type === 'crateBroken' || e.type === 'crateRespawned') redraw = true;
         if (e.type === 'crateRespawnWarning') this.ghosts.set(e.x + ',' + e.y, { x: e.x, y: e.y, born: this.time.now });
         if (e.type === 'crateRespawnCancelled') this.ghosts.delete(e.x + ',' + e.y);
@@ -76,11 +78,19 @@ class Arena extends Phaser.Scene {
       drawUnit(g, classes[p.cls]?.shape, x, y, r, Math.atan2(p.aim?.y || 0, p.aim?.x || 1), col, glow);
       if (p.spawnShieldLeft > 0) g.lineStyle(2, glow, FX.spawnShield.alpha + 0.3 * Math.sin(now / FX.spawnShield.pulseMs * 6.28)).strokeCircle(x, y, r + 9);
       g.fillStyle(0x000000, 0.6).fillRect(x - 18, y - r - 14, 36, 4).fillStyle(col).fillRect(x - 18, y - r - 14, 36 * p.hp / p.maxHp, 4);
-      if (p.id === 'me') for (let i = 0; i < classes.Assault.weapon.charges; i++) { const f = i < p.charges ? 1 : i === p.charges ? p.chargeProgress : 0; g.fillStyle(0x000000, 0.6).fillRect(x - 18 + i * 12.5, y + r + 8, 11, 3).fillStyle(PALETTE.score).fillRect(x - 18 + i * 12.5, y + r + 8, 11 * f, 3); }
+      if (p.id === 'me') for (let i = 0; i < classes[p.cls].weapon.charges; i++) { const f = i < p.charges ? 1 : i === p.charges ? p.chargeProgress : 0; g.fillStyle(0x000000, 0.6).fillRect(x - 18 + i * 12.5, y + r + 8, 11, 3).fillStyle(PALETTE.score).fillRect(x - 18 + i * 12.5, y + r + 8, 11 * f, 3); }
     }
     const aim = this.input_.aimPreview();
     if (aim && this.me.alive) { const r = raycast(this.world, this.me, aim, classes[this.me.cls].weapon.range * TILE_PX, { ignoreId: 'me', ignoreTeam: 'blue' }); g.lineStyle(3, PALETTE.blueGlow, 0.35).lineBetween(this.me.x, this.me.y, r.point.x, r.point.y); }
     for (const b of this.cur.projectiles) { const pb = this.prev.projectiles.find(q => q.id === b.id) || b; const x = lerp(pb.x, b.x), y = lerp(pb.y, b.y), c = b.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow; g.lineStyle(FX.bulletTrail.width, c, FX.bulletTrail.alpha).lineBetween(pb.x, pb.y, x, y).fillStyle(c).fillCircle(x, y, 3); }
+    // Abilities v0 (enkel placeholder-grafik; Artist kan erstatte via de samme snapshot-felter/events)
+    for (const z of this.cur.zones || []) this.fxG.fillStyle(PALETTE.heal, 0.12 + 0.05 * Math.sin(now / 200)).fillCircle(z.x, z.y, z.radius).lineStyle(2, PALETTE.heal, 0.6).strokeCircle(z.x, z.y, z.radius);
+    for (const gr of this.cur.grenades || []) { const k = 1 - gr.fuse / gr.fuseSec, c = gr.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow;
+      const gx = gr.from.x + (gr.x - gr.from.x) * Math.min(1, k * 1.6), gy = gr.from.y + (gr.y - gr.from.y) * Math.min(1, k * 1.6) - Math.sin(Math.min(1, k * 1.6) * Math.PI) * 40;
+      this.fxG.lineStyle(2, c, 0.5).strokeCircle(gr.x, gr.y, gr.radius).fillStyle(c).fillCircle(gx, gy, 6); }
+    this.booms = (this.booms || []).filter(b => now - b.born < 300);
+    for (const b of this.booms) { const k = (now - b.born) / 300; this.fxG.fillStyle(0xffffff, 0.5 * (1 - k)).fillCircle(b.x, b.y, b.radius * (0.6 + 0.4 * k)); }
+    for (const p of this.cur.players) if (p.alive && (p.focusLeft > 0 || p.invulnLeft > 0)) this.fxG.lineStyle(2, p.focusLeft > 0 ? PALETTE.score : 0xffffff, 0.8).strokeCircle(p.x, p.y, (p.radius ?? 18) + 7);
     this.trails = this.trails.filter(t => now - t.born < FX.bulletTrail.ms);
     for (const gh of this.ghosts.values()) { const a = FX.crateRespawn.ghostAlpha * (0.6 + 0.4 * Math.sin((now - gh.born) / FX.crateRespawn.pulseMs * 6.28)); const m = TILE_PX * 0.08; this.fxG.fillStyle(PALETTE.crate, a).fillRect(gh.x * TILE_PX + m, gh.y * TILE_PX + m, TILE_PX - 2 * m, TILE_PX - 2 * m).lineStyle(2, PALETTE.crateEdge, a * 2).strokeRect(gh.x * TILE_PX + m, gh.y * TILE_PX + m, TILE_PX - 2 * m, TILE_PX - 2 * m); }
     this.pops = this.pops.filter(pp => now - pp.born < FX.crateRespawn.popMs);

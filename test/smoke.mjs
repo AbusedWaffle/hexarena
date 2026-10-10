@@ -13,7 +13,7 @@ while (!w.match.over && ticks < 20 * 400) {
   for (const p of w.players) {
     const f = inputs[p.id]; f.seq++;
     if (ticks % 20 === 0) { const a = rnd() * 6.283; f.move = { x: Math.cos(a), y: Math.sin(a) }; }
-    f.aim = rnd() < 0.5 ? null : { x: rnd() - 0.5, y: rnd() - 0.5 }; f.fire = rnd() < 0.3;
+    f.aim = rnd() < 0.5 ? null : { x: rnd() - 0.5, y: rnd() - 0.5 }; f.fire = rnd() < 0.3; f.ability = rnd() < 0.05;
   }
   step(w, inputs); ticks++;
   for (const e of w.events) { if (e.type === 'kill') kills++; if (e.type === 'hit') hits++; if (e.type === 'crateBroken') cratesBroken++; }
