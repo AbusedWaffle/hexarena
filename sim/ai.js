@@ -11,7 +11,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const norm = (v) => { const l = Math.hypot(v.x, v.y) || 1; return { x: v.x / l, y: v.y / l }; };
 
 // A* på tiles med neighbors() (8 retninger, ingen hjørneskæring). Returnerer tile-liste uden starttile.
-export function findPath(w, from, to, maxNodes = 2000) {
+export function findPath(w, from, to, maxNodes = 2000, extraCost = null) {
   const goal = key(to.x, to.y); const t = w.tiles.get(goal); if (!t || isBlocking(t)) return null;
   const h = (x, y) => { const dx = Math.abs(x - to.x), dy = Math.abs(y - to.y); return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy); };
   const open = [{ x: from.x, y: from.y, g: 0, f: h(from.x, from.y) }], came = new Map(), g = new Map([[key(from.x, from.y), 0]]);
@@ -21,7 +21,7 @@ export function findPath(w, from, to, maxNodes = 2000) {
     const cur = open.splice(bi, 1)[0], ck = key(cur.x, cur.y);
     if (ck === goal) { const path = []; let k = ck; while (came.has(k)) { const [x, y] = k.split(',').map(Number); path.unshift({ x, y }); k = came.get(k); } return path; }
     for (const nb of neighbors(w, cur.x, cur.y)) {
-      const nk = key(nb.x, nb.y), ng = cur.g + nb.cost;
+      const nk = key(nb.x, nb.y), ng = cur.g + nb.cost + (extraCost ? extraCost(nb.x, nb.y) : 0);
       if (ng < (g.get(nk) ?? Infinity)) { g.set(nk, ng); came.set(nk, ck); open.push({ x: nb.x, y: nb.y, g: ng, f: ng + h(nb.x, nb.y) }); }
     }
   }
@@ -82,6 +82,7 @@ export function createAI(w, cfg, seed = 1) {
       const sup = w.players.find(q => q.alive && q.team === p.team && q.id !== p.id && w.classes[q.cls].ability?.id === 'heal_zone');
       if (sup) return tileOf(sup); const sp = w.map.spawns[p.team]; return sp[b.slot % sp.length]; }
     if (b.state === 'cover' && b.coverTile) return b.coverTile;
+    if (b.state === 'approach' && b.target) return tileOf(b.target);
     const tgt = b.mem || nearest(p, enemiesOf(p));
     if (!tgt) return null;
     let g = tileOf(tgt);
@@ -92,6 +93,7 @@ export function createAI(w, cfg, seed = 1) {
     }
     return g;
   }
+  const prof = (p) => (cfg.classes && cfg.classes[p.cls]) || {};
   const nearest = (p, list) => list.reduce((a, e) => (!a || dist(p, e) < dist(p, a) ? e : a), null);
 
   function think(b, p) {
@@ -103,16 +105,20 @@ export function createAI(w, cfg, seed = 1) {
     if (hpf < (cfg.retreatHpFrac ?? 0.3) && (b.state === 'retreat' || retreatingCount(p.team) < maxRetreat)) next = 'retreat';
     else if (threat && (p.charges === 0 || hpf < (cfg.coverHpFrac ?? 0.55)) && (b.state === 'cover' || R() < b.diff.coverBias)) next = 'cover';
     else if (b.target) next = 'engage';
-    // Der er ingen HP-regen endnu, så retreat er tidsbegrænset; ellers står botten bare ved spawn
+    // Retreat og cover er tidsbegrænsede, så botten ikke bare står stille
     if (next === 'retreat' && (hpf > 0.8 || (b.state === 'retreat' && now - b.stateSince > (cfg.retreatMaxSec ?? 4)))) next = b.target ? 'engage' : 'seek';
     if (next === 'cover' && b.state === 'cover' && now - b.stateSince > (cfg.coverMaxSec ?? 3) && p.charges > 0) next = b.target ? 'engage' : 'seek';
     if (next === 'cover' && p.charges === wp.charges && hpf >= (cfg.coverHpFrac ?? 0.55)) next = b.target ? 'engage' : 'seek';
-    if (next !== b.state) { b.state = next; b.stateSince = now; b.path = []; if (next === 'seek') b.flank = R() < b.diff.flankChance; if (next === 'cover') b.coverTile = threat ? findCover(p, threat) : null; }
+    // Kort rækkevidde: kom tæt på via cover i stedet for at gå lige på
+    if (next === 'engage' && prof(p).coverApproach && dist(p, b.target) > wp.range * U * (prof(p).fireRangeFrac ?? 1) * 1.3) next = 'approach';
+    if (next !== b.state) { b.state = next; b.stateSince = now; b.path = []; if (next === 'seek') b.flank = R() < b.diff.flankChance + (prof(p).flankBonus ?? 0); if (next === 'cover') b.coverTile = threat ? findCover(p, threat) : null; }
     // Sti
     if (b.state !== 'engage') {
       const g = goalFor(b, p);
       if (g && (!b.pathGoal || g.x !== b.pathGoal.x || g.y !== b.pathGoal.y || b.pathVersion !== mapVersion || !b.path.length)) {
-        b.path = findPath(w, tileOf(p), g) || []; b.pathGoal = g; b.pathVersion = mapVersion;
+        const th = b.state === 'approach' || (b.state === 'seek' && prof(p).coverApproach) ? (b.target || b.mem) : null, exp = cfg.exposureCost ?? 3, seen = new Map();
+        const cost = th ? (x, y) => { const k = key(x, y); if (!seen.has(k)) seen.set(k, hasLineOfSight(w, center({ x, y }), th) ? exp : 0); return seen.get(k); } : null;
+        b.path = findPath(w, tileOf(p), g, 2000, cost) || findPath(w, tileOf(p), g) || []; b.pathGoal = g; b.pathVersion = mapVersion;
       }
     }
     // Strafe-retning skifter tilfældigt
@@ -136,7 +142,7 @@ export function createAI(w, cfg, seed = 1) {
     const wp = w.classes[p.cls].weapon, now = w.tick * DT, f = { move: { x: 0, y: 0 }, aim: null, fire: false, ability: false, seq: ++b.seq };
     const t = b.target && b.target.alive ? b.target : null;
     if (b.state === 'engage' && t) {
-      const d = dist(p, t), pref = wp.range * U * (cfg.preferredRangeFrac ?? 0.6), to = norm({ x: t.x - p.x, y: t.y - p.y });
+      const d = dist(p, t), pref = wp.range * U * (prof(p).preferredRangeFrac ?? cfg.preferredRangeFrac ?? 0.6), to = norm({ x: t.x - p.x, y: t.y - p.y });
       const radial = d > pref * 1.15 ? 1 : d < pref * 0.75 ? -1 : 0;
       let mv = { x: to.x * radial - to.y * b.strafe * 0.8, y: to.y * radial + to.x * b.strafe * 0.8 };
       // undgå at strafe ind i en væg
@@ -149,7 +155,7 @@ export function createAI(w, cfg, seed = 1) {
       if (prev && wp.projectileSpeed > 0 && b.diff.leadTarget > 0) { const vx = (t.x - prev.x) / DT, vy = (t.y - prev.y) / DT, tt = d / (wp.projectileSpeed * U); ax += vx * tt * b.diff.leadTarget; ay += vy * tt * b.diff.leadTarget; }
       const a = Math.atan2(ay - p.y, ax - p.x) + b.aimErr; f.aim = { x: Math.cos(a), y: Math.sin(a) };
       const reacted = b.seenSince != null && (now - b.seenSince) * 1000 >= b.diff.reactionMs;
-      if (reacted && d <= wp.range * U * 0.95 && p.charges > 0 && !p.salvo) {
+      if (reacted && d <= wp.range * U * (prof(p).fireRangeFrac ?? 0.95) && p.charges > 0 && !p.salvo) {
         const ray = raycast(w, p, f.aim, d, { ignoreId: p.id });  // ingen friendly fire-skud gennem holdkammerater
         if (!(ray.entityId && ray.team === p.team)) f.fire = true;
       }
@@ -157,7 +163,7 @@ export function createAI(w, cfg, seed = 1) {
       f.move = followPath(b, p);
       if (b.target) { const a = Math.atan2(b.target.y - p.y, b.target.x - p.x) + b.aimErr; f.aim = { x: Math.cos(a), y: Math.sin(a) };
         // skyder mens den trækker sig, hvis den har ladninger
-        if (b.state === 'retreat' && p.charges > 0 && dist(p, b.target) <= wp.range * U * 0.8 && b.seenSince != null && (now - b.seenSince) * 1000 >= b.diff.reactionMs) f.fire = true;
+        if ((b.state === 'retreat' || b.state === 'approach') && p.charges > 0 && dist(p, b.target) <= wp.range * U * Math.min(0.9, prof(p).fireRangeFrac ?? 0.9) && b.seenSince != null && (now - b.seenSince) * 1000 >= b.diff.reactionMs) f.fire = true;
       } else if (Math.hypot(f.move.x, f.move.y) > 0) f.aim = { ...f.move };
     }
     if (p.abilityCooldownLeft === 0) useAbility(b, p, f, t);

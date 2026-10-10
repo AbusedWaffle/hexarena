@@ -27,5 +27,28 @@
     "flankChance": 0.4
   },
   "retreatMaxSec": 4,
-  "coverMaxSec": 3
+  "coverMaxSec": 3,
+  "_classNote": "Klasseprofiler: flankBonus lægges til sværhedsgradens flankChance. coverApproach = nærmer sig via stier, der undgår målets synslinje, når målet er uden for egen rækkevidde. preferredRangeFrac overstyrer den globale. fireRangeFrac = skyd først, når målet er inden for denne andel af våbnets rækkevidde (hagl spreder meget på lang afstand).",
+  "classes": {
+    "Assault": {},
+    "Sniper": {
+      "preferredRangeFrac": 0.8
+    },
+    "Engineer": {
+      "flankBonus": 0.35,
+      "coverApproach": true,
+      "preferredRangeFrac": 0.35,
+      "fireRangeFrac": 0.5
+    },
+    "Scout": {
+      "flankBonus": 0.3,
+      "coverApproach": true,
+      "preferredRangeFrac": 0.45,
+      "fireRangeFrac": 0.75
+    },
+    "Support": {
+      "flankBonus": 0.1
+    }
+  },
+  "exposureCost": 3
 }
