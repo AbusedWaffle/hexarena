@@ -253,7 +253,9 @@ export function step(w, inputs) {
     p.lastSeq = inp.seq ?? p.lastSeq;
     const m = inp.move || { x: 0, y: 0 }, ml = Math.min(1, Math.hypot(m.x, m.y)), mn = Math.hypot(m.x, m.y) || 1;
     const v = c.speed * U * DT * ml;
-    p.x += m.x / mn * v; p.y += m.y / mn * v; resolveCollision(w, p);
+    // Del bevægelsen op, så intet skridt er længere end ½ radius (ingen hjørneskæring ved høj fart)
+    const sub = Math.max(1, Math.ceil(v / (p.radius * 0.5)));
+    for (let i = 0; i < sub; i++) { p.x += m.x / mn * v / sub; p.y += m.y / mn * v / sub; resolveCollision(w, p); }
     if (inp.aim && Math.hypot(inp.aim.x, inp.aim.y) > 0.01) p.aim = { x: inp.aim.x, y: inp.aim.y };
     if (inp.fire && !p.salvo && p.charges > 0 && p.fireCooldownLeft === 0) {
       let dir = inp.aim, auto = false;
