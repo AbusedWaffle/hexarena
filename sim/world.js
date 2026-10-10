@@ -1,19 +1,21 @@
 // Ren simulation (ingen Phaser). Hosten kalder step(world, inputs) 20 gange i sekundet.
-import { HEX_PX, HEX_DIST, DIRS, key, hexToPixel, pixelToHex, hexCorners } from './hex.js';
+import { TILE_PX, DIRS4, DIRS8, key, tileToPixel, pixelToTile } from './grid.js';
+const U = TILE_PX; // 1 tile i px
 export const TICK_HZ = 20, DT = 1 / TICK_HZ;
-const PLAYER_RADIUS_HEX = 0.2;
+const PLAYER_RADIUS = 0.4; // tiles, fallback hvis klassen ikke har radius
 const CRATE_WARN_SEC = 1.5; // varsel før kasse-respawn (matcher FX.crateRespawn)
 
 export function createWorld(map, classes) {
-  const tiles = new Map();
-  for (const t of map.tiles) tiles.set(key(t.q, t.r), { q: t.q, r: t.r, type: t.type, hp: t.type === 'crate' ? (classes._match.crateHp ?? t.hp) : 0, maxHp: classes._match.crateHp ?? t.hp });
+  const tiles = new Map(), crateHp = classes._match.crateHp ?? 100;
+  for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) tiles.set(key(x, y), { x, y, type: 'floor', hp: 0, maxHp: crateHp });
+  for (const t of map.tiles) { const c = tiles.get(key(t.x, t.y)); if (!c) continue; c.type = t.type; if (t.type === 'crate') c.hp = crateHp; }
   return { map, classes, tiles, players: [], projectiles: [], events: [], tick: 0,
     match: { score: { blue: 0, red: 0 }, timeLeft: classes._match.durationSec, over: false }, nextId: 1 };
 }
 
 export function addPlayer(w, { team, cls, id }) {
   const c = w.classes[cls], wp = c.weapon;
-  const p = { id: id ?? 'p' + w.nextId++, team, cls, radius: (c.radius ?? PLAYER_RADIUS_HEX) * HEX_PX,
+  const p = { id: id ?? 'p' + w.nextId++, team, cls, radius: (c.radius ?? PLAYER_RADIUS) * U,
     x: 0, y: 0, hp: c.hp, maxHp: c.hp, alive: true, aim: { x: 1, y: 0 },
     charges: wp.charges, chargeProgress: 0, fireCooldownLeft: 0, salvo: null,
     abilityCooldownLeft: 0, spawnShieldLeft: 0, respawnLeft: 0, kills: 0, deaths: 0, lastSeq: 0 };
@@ -24,7 +26,7 @@ function spawn(w, p) {
   // Ledig spawn længst fra synlige fjender (fjender uden synslinje tæller svagere)
   const list = w.map.spawns[p.team]; let s = list[0], best = -Infinity;
   for (const c of list) {
-    const cp = hexToPixel(c.q, c.r); let score = 0;
+    const cp = tileToPixel(c.x, c.y); let score = 0;
     for (const o of w.players) if (o !== p && o.alive) {
       const d = Math.hypot(o.x - cp.x, o.y - cp.y);
       if (o.team === p.team) { if (d < p.radius * 3) score -= 1e6; }
@@ -32,53 +34,76 @@ function spawn(w, p) {
     }
     if (score > best) { best = score; s = c; }
   }
-  const px = hexToPixel(s.q, s.r);
+  const px = tileToPixel(s.x, s.y);
   Object.assign(p, { x: px.x, y: px.y, hp: p.maxHp, alive: true, spawnShieldLeft: w.classes._match.spawnShieldSec, charges: w.classes[p.cls].weapon.charges, chargeProgress: 0, salvo: null });
   w.events.push({ type: 'respawn', id: p.id });
 }
 
 export const isBlocking = (t) => t && (t.type === 'wall' || t.type === 'crate');
-export function tileAt(w, x, y) { const h = pixelToHex(x, y); return w.tiles.get(key(h.q, h.r)); }
-export function hexAt(w, x, y) { return pixelToHex(x, y); }
-export function neighbors(w, q, r) {
-  return DIRS.map(([dq, dr]) => w.tiles.get(key(q + dq, r + dr))).filter(t => t && t.type === 'floor').map(t => ({ q: t.q, r: t.r }));
+export function tileAt(w, px, py) { const t = pixelToTile(px, py); return w.tiles.get(key(t.x, t.y)); }
+export { tileToPixel, pixelToTile };
+const free = (w, x, y) => { const t = w.tiles.get(key(x, y)); return t && !isBlocking(t); };
+// 8 retninger uden at skære hjørner: diagonalt kun når begge nabotiles er fri. cost: 1 eller √2
+export function neighbors(w, x, y) {
+  const out = [];
+  for (const [dx, dy] of DIRS8) {
+    if (!free(w, x + dx, y + dy)) continue;
+    if (dx && dy && !(free(w, x + dx, y) && free(w, x, y + dy))) continue;
+    out.push({ x: x + dx, y: y + dy, cost: dx && dy ? Math.SQRT2 : 1 });
+  }
+  return out;
 }
 
 // raycast i pixels. opts: { ignoreId, ignoreTeam, hitEntities=true }
 export function raycast(w, from, dir, range, opts = {}) {
-  const len = Math.hypot(dir.x, dir.y) || 1, dx = dir.x / len, dy = dir.y / len, step = 4;
-  const hitEntities = opts.hitEntities !== false;
-  for (let d = 0; d <= range; d += step) {
-    const x = from.x + dx * d, y = from.y + dy * d, t = tileAt(w, x, y);
-    if (!t || isBlocking(t)) return { hit: true, point: { x, y }, dist: d, tile: t ? { q: t.q, r: t.r, type: t.type } : null, entityId: null, team: null };
-    if (hitEntities) for (const p of w.players) {
-      if (!p.alive || p.id === opts.ignoreId || p.team === opts.ignoreTeam) continue;
-      if (Math.hypot(p.x - x, p.y - y) <= p.radius) return { hit: true, point: { x, y }, dist: d, tile: null, entityId: p.id, team: p.team };
-    }
+  const len = Math.hypot(dir.x, dir.y) || 1, dx = dir.x / len, dy = dir.y / len;
+  // DDA gennem tiles til første væg/kasse eller range
+  let tx = Math.floor(from.x / U), ty = Math.floor(from.y / U);
+  const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1;
+  const tdx = dx ? Math.abs(U / dx) : Infinity, tdy = dy ? Math.abs(U / dy) : Infinity;
+  let mx = dx ? ((dx > 0 ? (tx + 1) * U - from.x : from.x - tx * U) / Math.abs(dx)) : Infinity;
+  let my = dy ? ((dy > 0 ? (ty + 1) * U - from.y : from.y - ty * U) / Math.abs(dy)) : Infinity;
+  let wallD = range, wallTile = null, d = 0;
+  const t0 = w.tiles.get(key(tx, ty));
+  if (!t0 || isBlocking(t0)) { wallD = 0; wallTile = t0 || null; }
+  else while (d <= range) {
+    if (mx < my) { d = mx; mx += tdx; tx += sx; } else { d = my; my += tdy; ty += sy; }
+    if (d > range) break;
+    const t = w.tiles.get(key(tx, ty));
+    if (!t || isBlocking(t)) { wallD = d; wallTile = t || null; break; }
   }
-  return { hit: false, point: { x: from.x + dx * range, y: from.y + dy * range }, dist: range, tile: null, entityId: null, team: null };
+  // spillere: analytisk stråle mod cirkel, kun før væggen
+  let best = null;
+  if (opts.hitEntities !== false) for (const p of w.players) {
+    if (!p.alive || p.id === opts.ignoreId || p.team === opts.ignoreTeam) continue;
+    const ox = p.x - from.x, oy = p.y - from.y, b = ox * dx + oy * dy, c = ox * ox + oy * oy - p.radius * p.radius;
+    const disc = b * b - c; if (disc < 0) continue;
+    const t = c <= 0 ? 0 : b - Math.sqrt(disc);
+    if (t >= 0 && t <= wallD && (!best || t < best.t)) best = { t, p };
+  }
+  const at = (t) => ({ x: from.x + dx * t, y: from.y + dy * t });
+  if (best) return { hit: true, point: at(best.t), dist: best.t, tile: null, entityId: best.p.id, team: best.p.team };
+  if (wallD < range || wallTile) return { hit: true, point: at(wallD), dist: wallD, tile: wallTile ? { x: wallTile.x, y: wallTile.y, type: wallTile.type } : null, entityId: null, team: null };
+  return { hit: false, point: at(range), dist: range, tile: null, entityId: null, team: null };
 }
 export function hasLineOfSight(w, a, b) {
   const d = Math.hypot(b.x - a.x, b.y - a.y);
   return !raycast(w, a, { x: b.x - a.x, y: b.y - a.y }, d, { hitEntities: false }).hit;
 }
 
-// Cirkel mod hex-polygon: skub ud langs nærmeste kant, så man glider på hjørner.
+// Cirkel mod kvadrat: skub ud fra nærmeste punkt på tilen, så man glider langs kanter og hjørner.
 function resolveCollision(w, p) {
-  const h = pixelToHex(p.x, p.y);
-  for (let it = 0; it < 2; it++) for (const [dq, dr] of [[0, 0], ...DIRS]) {
-    const t = w.tiles.get(key(h.q + dq, h.r + dr));
-    if (t && !isBlocking(t)) continue;
-    const cs = hexCorners(h.q + dq, h.r + dr); let best = null;
-    for (let i = 0; i < 6; i++) {
-      const a = cs[i], b = cs[(i + 1) % 6], ex = b.x - a.x, ey = b.y - a.y;
-      const u = Math.max(0, Math.min(1, ((p.x - a.x) * ex + (p.y - a.y) * ey) / (ex * ex + ey * ey)));
-      const cx = a.x + ex * u, cy = a.y + ey * u, dd = Math.hypot(p.x - cx, p.y - cy);
-      if (!best || dd < best.d) best = { d: dd, cx, cy };
+  for (let it = 0; it < 2; it++) {
+    const cx = Math.floor(p.x / U), cy = Math.floor(p.y / U);
+    for (let yy = cy - 1; yy <= cy + 1; yy++) for (let xx = cx - 1; xx <= cx + 1; xx++) {
+      const t = w.tiles.get(key(xx, yy)); if (t && !isBlocking(t)) continue;
+      const x0 = xx * U, y0 = yy * U, nx = Math.max(x0, Math.min(p.x, x0 + U)), ny = Math.max(y0, Math.min(p.y, y0 + U));
+      const ddx = p.x - nx, ddy = p.y - ny, d = Math.hypot(ddx, ddy);
+      if (d === 0) { // centrum inde i tilen: skub ud ad korteste akse
+        const l = p.x - x0, r = x0 + U - p.x, tp = p.y - y0, b = y0 + U - p.y, m = Math.min(l, r, tp, b);
+        if (m === l) p.x = x0 - p.radius; else if (m === r) p.x = x0 + U + p.radius; else if (m === tp) p.y = y0 - p.radius; else p.y = y0 + U + p.radius;
+      } else if (d < p.radius) { p.x = nx + ddx / d * p.radius; p.y = ny + ddy / d * p.radius; }
     }
-    const c = hexToPixel(h.q + dq, h.r + dr), inside = Math.hypot(p.x - c.x, p.y - c.y) < HEX_PX * 0.866;
-    if (inside) { const nx = best.cx - c.x, ny = best.cy - c.y, n = Math.hypot(nx, ny) || 1; p.x = best.cx + nx / n * p.radius; p.y = best.cy + ny / n * p.radius; }
-    else if (best.d < p.radius) { const nx = p.x - best.cx, ny = p.y - best.cy, n = best.d || 1; p.x = best.cx + nx / n * p.radius; p.y = best.cy + ny / n * p.radius; }
   }
 }
 
@@ -100,8 +125,8 @@ function fireShot(w, p) {
     const spread = rad(s.auto ? wp.autoAimSpreadDeg : wp.spreadDeg);
     const a = Math.atan2(s.dir.y, s.dir.x) + (wp.pellets > 1 ? spread * (i / (wp.pellets - 1) - 0.5) + rnd(spread * 0.1) : rnd(spread / 2));
     const dir = { x: Math.cos(a), y: Math.sin(a) }, ox = p.x + dir.x * p.radius, oy = p.y + dir.y * p.radius;
-    const range = wp.range * HEX_DIST;
-    if (wp.projectileSpeed > 0) w.projectiles.push({ id: w.nextId++, owner: p.id, team: p.team, x: ox, y: oy, dir, speed: wp.projectileSpeed * HEX_DIST, left: range, damage: wp.damage });
+    const range = wp.range * U;
+    if (wp.projectileSpeed > 0) w.projectiles.push({ id: w.nextId++, owner: p.id, team: p.team, x: ox, y: oy, dir, speed: wp.projectileSpeed * U, left: range, damage: wp.damage });
     else { const hit = raycast(w, { x: ox, y: oy }, dir, range, { ignoreTeam: p.team }); applyHit(w, p.id, hit, wp.damage); w.events.push({ type: 'shot', id: p.id, from: { x: ox, y: oy }, to: hit.point, hitscan: true }); }
   }
   if (wp.projectileSpeed > 0) w.events.push({ type: 'shot', id: p.id, from: { x: p.x, y: p.y }, dir: s.dir });
@@ -122,9 +147,9 @@ function applyHit(w, ownerId, hit, damage) {
       if (w.match.score.blue >= w.classes._match.killTarget || w.match.score.red >= w.classes._match.killTarget) endMatch(w);
     }
   } else if (hit.tile && hit.tile.type === 'crate') {
-    const t = w.tiles.get(key(hit.tile.q, hit.tile.r));
-    t.hp -= damage; w.events.push({ type: 'crateDamaged', q: t.q, r: t.r, hp: t.hp, maxHp: t.maxHp });
-    if (t.hp <= 0) { t.type = 'floor'; t.hp = 0; t.wasCrate = true; t.respawnLeft = w.classes._match.crateRespawnSec ?? Infinity; w.events.push({ type: 'crateBroken', q: t.q, r: t.r }); }
+    const t = w.tiles.get(key(hit.tile.x, hit.tile.y));
+    t.hp -= damage; w.events.push({ type: 'crateDamaged', x: t.x, y: t.y, hp: t.hp, maxHp: t.maxHp });
+    if (t.hp <= 0) { t.type = 'floor'; t.hp = 0; t.wasCrate = true; t.respawnLeft = w.classes._match.crateRespawnSec ?? Infinity; w.events.push({ type: 'crateBroken', x: t.x, y: t.y }); }
   }
 }
 function endMatch(w) { if (!w.match.over) { w.match.over = true; const s = w.match.score; w.events.push({ type: 'matchOver', winner: s.blue === s.red ? 'draw' : s.blue > s.red ? 'blue' : 'red' }); } }
@@ -143,12 +168,12 @@ export function step(w, inputs) {
     if (!inp || w.match.over) continue;
     p.lastSeq = inp.seq ?? p.lastSeq;
     const m = inp.move || { x: 0, y: 0 }, ml = Math.min(1, Math.hypot(m.x, m.y)), mn = Math.hypot(m.x, m.y) || 1;
-    const v = c.speed * HEX_DIST * DT * ml;
+    const v = c.speed * U * DT * ml;
     p.x += m.x / mn * v; p.y += m.y / mn * v; resolveCollision(w, p);
     if (inp.aim && Math.hypot(inp.aim.x, inp.aim.y) > 0.01) p.aim = { x: inp.aim.x, y: inp.aim.y };
     if (inp.fire && !p.salvo && p.charges > 0 && p.fireCooldownLeft === 0) {
       let dir = inp.aim, auto = false;
-      if (!dir) { const t = autoAimTarget(w, p, wp.range * HEX_DIST); dir = t ? { x: t.x - p.x, y: t.y - p.y } : p.aim; auto = true; }
+      if (!dir) { const t = autoAimTarget(w, p, wp.range * U); dir = t ? { x: t.x - p.x, y: t.y - p.y } : p.aim; auto = true; }
       p.aim = dir; p.charges--; p.fireCooldownLeft = wp.fireCooldownSec; p.spawnShieldLeft = 0;
       p.salvo = { dir, auto, left: wp.shotsPerCharge, next: 0 };
     }
@@ -165,27 +190,27 @@ export function step(w, inputs) {
     else { b.x += b.dir.x * d; b.y += b.dir.y * d; b.left -= d; }
   }
   w.projectiles = w.projectiles.filter(b => b.left > 0);
-  // Kasse-respawn: kun når ingen spiller står inden for crateRespawnBlockRadius hex
-  const blockPx = ((w.classes._match.crateRespawnBlockRadius ?? 1) + 0.5) * HEX_DIST;
+  // Kasse-respawn: kun når ingen spiller står inden for crateRespawnBlockRadius tiles
+  const blockPx = ((w.classes._match.crateRespawnBlockRadius ?? 1) + 0.5) * U;
   for (const t of w.tiles.values()) {
     if (!t.wasCrate || t.type !== 'floor') continue;
     t.respawnLeft -= DT; if (t.respawnLeft > 0) continue;
-    const c = hexToPixel(t.q, t.r), blocked = w.players.some(p => p.alive && Math.hypot(p.x - c.x, p.y - c.y) < blockPx);
+    const c = tileToPixel(t.x, t.y), blocked = w.players.some(p => p.alive && Math.hypot(p.x - c.x, p.y - c.y) < blockPx);
     if (t.warnLeft == null) {          // fase 1: varsel, når pladsen er fri
-      if (!blocked) { t.warnLeft = CRATE_WARN_SEC; w.events.push({ type: 'crateRespawnWarning', q: t.q, r: t.r, sec: CRATE_WARN_SEC }); }
+      if (!blocked) { t.warnLeft = CRATE_WARN_SEC; w.events.push({ type: 'crateRespawnWarning', x: t.x, y: t.y, sec: CRATE_WARN_SEC }); }
       continue;
     }
     t.warnLeft -= DT; if (t.warnLeft > 0) continue;
-    if (blocked) { t.warnLeft = null; w.events.push({ type: 'crateRespawnCancelled', q: t.q, r: t.r }); continue; } // nogen gik ind i spøgelset: prøv igen
+    if (blocked) { t.warnLeft = null; w.events.push({ type: 'crateRespawnCancelled', x: t.x, y: t.y }); continue; } // nogen gik ind i spøgelset: prøv igen
     t.type = 'crate'; t.hp = t.maxHp; t.wasCrate = false; t.warnLeft = null;
-    w.events.push({ type: 'crateRespawned', q: t.q, r: t.r });
+    w.events.push({ type: 'crateRespawned', x: t.x, y: t.y });
   }
 }
 
 // Snapshot til render, HUD og netværk (samme felter overalt)
 export function snapshot(w) {
   return { tick: w.tick, match: { score: { ...w.match.score }, timeLeft: w.match.timeLeft, over: w.match.over },
-    players: w.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, x: p.x, y: p.y, aim: p.aim, alive: p.alive, hp: p.hp, maxHp: p.maxHp,
+    players: w.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, radius: p.radius, x: p.x, y: p.y, aim: p.aim, alive: p.alive, hp: p.hp, maxHp: p.maxHp,
       charges: p.charges, chargeProgress: p.chargeProgress, abilityCooldownLeft: p.abilityCooldownLeft, spawnShieldLeft: p.spawnShieldLeft, respawnLeft: p.respawnLeft, lastSeq: p.lastSeq })),
     projectiles: w.projectiles.map(b => ({ id: b.id, team: b.team, x: b.x, y: b.y })), events: w.events };
 }

@@ -1,8 +1,8 @@
 // Integrations-smoke-test: 4 mod 4, alle klasser, tilfældige inputs, hele kampen headless.
 import fs from 'node:fs';
 const { createWorld, addPlayer, step, snapshot, tileAt, isBlocking } = await import('../sim/world.js');
-const map = JSON.parse(fs.readFileSync(new URL('../data/map_paintyard_01.json', import.meta.url)));
-const classes = JSON.parse(fs.readFileSync(new URL('../data/classes.json', import.meta.url)));
+const map = JSON.parse(fs.readFileSync(new URL('../data/map_paintyard_sq_01.json', import.meta.url)));
+const classes = JSON.parse(fs.readFileSync(new URL('../data/classes.square.json', import.meta.url)));
 let seed = Number(process.argv[2] ?? 1); const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const w = createWorld(map, classes);
 const cls = ['Assault', 'Sniper', 'Engineer', 'Scout'];
