@@ -20,6 +20,7 @@ export const FX = {
   hitSpark:    { count: 6, speed: 160, ms: 220, size: 3 }, // holdfarvede prikker
   hitFlash:    { ms: 80, tint: 0xFFFFFF },
   crateBreak:  { shards: 8, ms: 400 },
+  crateRespawn: { warnMs: 1500, ghostAlpha: 0.25, pulseMs: 300, popMs: 150 }, // spøgelses-kasse blinker før den kommer tilbage
   crateDamageTint: [1.0, 0.8, 0.6],
   screenShake: { hit: 2, death: 6, ms: 120 },
   spawnShield: { pulseMs: 400, alpha: 0.35 },
