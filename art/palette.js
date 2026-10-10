@@ -26,6 +26,15 @@ export const FX = {
   spawnShield: { pulseMs: 400, alpha: 0.35 },
   scorePop:    { scale: 1.4, ms: 200 },
 
+  abilities: {
+    heal:      { fadeSec: 0.5, ringSpin: 0.8, dashes: 12, plusRate: 0.25, plusMs: 700 },
+    grenade:   { flightShare: 1.6, arcPx: 40 },   // flyver i de første ~60 % af lunten, blinker de sidste 30 %
+    explosion: { ms: 380, debris: 12, debrisSpeed: 260, debrisMs: 420, shake: 5, shakeMs: 160 },
+    dash:      { ms: 260, ghosts: 4 },
+    focus:     { spin: 2.5 },
+    invuln:    { pulseMs: 180 },
+  },
+
   // Flydende skadetal, samlet pr. mål
   damageNumber: {
     mergeWindowMs: 600,      // træffer på samme mål inden for vinduet lægges sammen

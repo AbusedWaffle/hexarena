@@ -1,0 +1,33 @@
+<!doctype html><html><body style="margin:0;background:#06091A"><script src="../vendor/phaser.min.js"></script>
+<script type="module">
+import { AbilityFx } from './abilityFx.js';
+import { drawUnit } from './shapes.js';
+import { PALETTE } from './palette.js';
+class S extends Phaser.Scene {
+  create() {
+    this.g = this.add.graphics(); this.pops = []; this.fx = new AbilityFx(this);
+    this.cur = { players: [
+      { id: 'me', team: 'blue', cls: 'Support', x: 200, y: 200, radius: 20, alive: true },
+      { id: 's', team: 'red', cls: 'Sniper', x: 520, y: 200, radius: 19, alive: true, focusLeft: 3 },
+      { id: 'sc', team: 'blue', cls: 'Scout', x: 900, y: 200, radius: 17, alive: true, invulnLeft: 0.3 },
+      { id: 'a', team: 'red', cls: 'Assault', x: 300, y: 500, radius: 20, alive: true }],
+      zones: [{ x: 200, y: 200, radius: 110, left: 3, team: 'blue' }],
+      grenades: [{ team: 'red', from: { x: 300, y: 500 }, x: 560, y: 470, fuse: 0.5, fuseSec: 1.2, radius: 70 }] };
+    this.t0 = this.time.now;
+  }
+  update() {
+    const now = this.time.now, el = now - this.t0;
+    if (!this.fired && el > 300) { this.fired = 1;
+      this.fx.onEvent({ type: 'explosion', id: 'a', x: 900, y: 500, radius: 70 }, this.cur);
+      this.fx.onEvent({ type: 'dash', id: 'sc', from: { x: 640, y: 200 }, to: { x: 900, y: 200 } }, this.cur); }
+    this.g.clear();
+    const shapes = { Support: 'support', Sniper: 'sniper', Scout: 'scout', Assault: 'assault' };
+    for (const p of this.cur.players) drawUnit(this.g, shapes[p.cls], p.x, p.y, p.radius, 0, p.team === 'blue' ? PALETTE.blue : PALETTE.red, p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow);
+    this.fx.draw(this.g, now, this.cur);
+    if (el > 380 && !this.done) { this.done = 1; document.title = 'READY'; }
+    if (this.done) this.scene.pause();
+  }
+}
+new Phaser.Game({ type: Phaser.CANVAS, width: 1100, height: 680, backgroundColor: '#06091A', scene: S });
+window.onerror = (m) => console.log('ERR ' + m);
+</script></body></html>
