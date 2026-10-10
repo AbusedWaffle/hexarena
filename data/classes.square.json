@@ -76,7 +76,7 @@
       "crateHp": 80,
       "placeRange": 1
     },
-    "radius": 0.46
+    "radius": 0.42
   },
   "Scout": {
     "hp": 75,
@@ -139,7 +139,9 @@
     "maxPlayers": 8,
     "maxPerTeam": 4,
     "crateRespawnSec": 25,
-    "crateRespawnBlockRadius": 1
+    "crateRespawnBlockRadius": 1,
+    "regenPerSec": 8,
+    "regenDelaySec": 3
   },
   "_ai": {
     "maxRetreatingPerTeam": 1,
