@@ -4,7 +4,8 @@ import { AbilityFx } from '../art/abilityFx.js';
 import { TILE_PX } from '../sim/grid.js';
 import { drawSquareMap } from '../art/squareMap.js';
 import { createWorld, addPlayer, step, snapshot, raycast, DT } from '../sim/world.js';
-import { createDevInput } from './devInput.js';
+import { createInputSystem } from './inputSystem.js';
+import { createHud } from './hud.js';
 import { createAI } from '../sim/ai.js';
 
 const [map, classes, aiCfg] = await Promise.all(['data/map_paintyard_sq_01.json', 'data/classes.square.json', 'data/ai.json'].map(u => fetch(u).then(r => r.json())));
@@ -27,12 +28,13 @@ class Arena extends Phaser.Scene {
     this.g = this.add.graphics(); this.fxG = this.add.graphics(); this.ghosts = new Map(); this.pops = []; this.abilityFx = new AbilityFx(this);
     this.camTarget = this.add.zone(this.me.x, this.me.y, 1, 1);
     this.cameras.main.setBounds(0, 0, map.width * TILE_PX, map.height * TILE_PX).setBackgroundColor(hexStr(PALETTE.bg)).startFollow(this.camTarget, true, 0.15, 0.15);
-    this.input_ = createDevInput(this, () => { const c = this.cameras.main; return { x: this.camTarget.x - c.worldView.x, y: this.camTarget.y - c.worldView.y }; });
+    this.input_ = createInputSystem(this, {
+      getPlayerScreenPos: () => { const c = this.cameras.main; return { x: this.me.x - c.worldView.x, y: this.me.y - c.worldView.y }; },
+      getAbilityRangePx: () => ((classes[this.me.cls].ability?.throwRange) || 6) * TILE_PX });
+    this.hudUI = createHud(this, { map, classes, world: this.world, input: this.input_ });
     this.trails = []; this.dmg = new Map(); this.sparks = [];
-    this.hud = this.add.text(640, 16, '', { fontFamily: 'Roboto Mono, monospace', fontSize: 28, color: hexStr(PALETTE.score) }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(10);
-    this.hud2 = this.add.text(16, 680, '', { fontFamily: 'Roboto Mono, monospace', fontSize: 18, color: hexStr(PALETTE.text) }).setScrollFactor(0).setDepth(10);
-    this.help = this.add.text(16, 56, 'WASD bevæg · hold mus = sigt, slip = skyd · mellemrum = auto-aim · E = ability (?cls=Sniper|Engineer|Scout|Support)\nMobil: venstre halvdel = bevæg, højre: tap = auto, træk+slip = manuel', { fontSize: 13, color: '#8a93b5' }).setScrollFactor(0).setDepth(10);
-    this.t = 0;
+    this.help = this.add.text(16, 690, 'WASD bevæg · venstreklik hold+slip = skyd · mellemrum = auto-aim · E = ability · højreklik hold+slip = sigtet ability', { fontSize: 12, color: '#5a6385' }).setScrollFactor(0).setDepth(10).setVisible(!this.sys.game.device.input.touch);
+    this.t = 0; globalThis.__arena = this; // dev-hook til UI-test
   }
   drawMap() {
     // banen fra Artists drawSquareMap, med aktuel kasse-tilstand (ødelagte kasser tegnes ikke)
@@ -75,7 +77,7 @@ class Arena extends Phaser.Scene {
     for (const p of this.cur.players) {
       const pp = this.prev.players.find(q => q.id === p.id) || p; if (!p.alive) continue;
       const x = lerp(pp.x, p.x), y = lerp(pp.y, p.y), col = p.team === 'blue' ? PALETTE.blue : PALETTE.red, glow = p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, r = p.radius ?? TILE_PX * 0.4;
-      if (p.id === 'me') { this.camTarget.setPosition(x, y); g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5); }
+      if (p.id === 'me') { const la = this.input_.aimPreview(), ll = la ? Math.hypot(la.x, la.y) || 1 : 1; this.camTarget.setPosition(x + (la ? la.x / ll * 1.5 * TILE_PX : 0), y + (la ? la.y / ll * 1.5 * TILE_PX : 0)); g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5); }
       drawUnit(g, classes[p.cls]?.shape, x, y, r, Math.atan2(p.aim?.y || 0, p.aim?.x || 1), col, glow);
       if (p.spawnShieldLeft > 0) g.lineStyle(2, glow, FX.spawnShield.alpha + 0.3 * Math.sin(now / FX.spawnShield.pulseMs * 6.28)).strokeCircle(x, y, r + 9);
       g.fillStyle(0x000000, 0.6).fillRect(x - 18, y - r - 14, 36, 4).fillStyle(col).fillRect(x - 18, y - r - 14, 36 * p.hp / p.maxHp, 4);
@@ -83,6 +85,13 @@ class Arena extends Phaser.Scene {
     }
     const aim = this.input_.aimPreview();
     if (aim && this.me.alive) { const r = raycast(this.world, this.me, aim, classes[this.me.cls].weapon.range * TILE_PX, { ignoreId: 'me', ignoreTeam: 'blue' }); g.lineStyle(3, PALETTE.blueGlow, 0.35).lineBetween(this.me.x, this.me.y, r.point.x, r.point.y); }
+    const ab = this.input_.abilityPreview(), abd = classes[this.me.cls].ability;
+    if (ab && this.me.alive && abd && ['grenade', 'dash', 'deploy_crate'].includes(abd.id)) {
+      const rng = (abd.throwRange || abd.distance || (abd.placeRange + 0.5) || 3) * TILE_PX, l = Math.hypot(ab.x, ab.y) || 1, len = abd.id === 'grenade' ? Math.max(0.05, l) * rng : rng;
+      const tx = this.me.x + ab.x / l * len, ty = this.me.y + ab.y / l * len;
+      g.lineStyle(2, PALETTE.score, 0.5).lineBetween(this.me.x, this.me.y, tx, ty);
+      if (abd.id === 'grenade') g.lineStyle(2, PALETTE.score, 0.8).strokeCircle(tx, ty, abd.radius * TILE_PX).fillStyle(PALETTE.score, 0.12).fillCircle(tx, ty, abd.radius * TILE_PX);
+    }
     for (const b of this.cur.projectiles) { const pb = this.prev.projectiles.find(q => q.id === b.id) || b; const x = lerp(pb.x, b.x), y = lerp(pb.y, b.y), c = b.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow; g.lineStyle(FX.bulletTrail.width, c, FX.bulletTrail.alpha).lineBetween(pb.x, pb.y, x, y).fillStyle(c).fillCircle(x, y, 3); }
     this.abilityFx.draw(this.fxG, now, this.cur);
     this.trails = this.trails.filter(t => now - t.born < FX.bulletTrail.ms);
@@ -94,9 +103,7 @@ class Arena extends Phaser.Scene {
     for (const s of this.sparks) { const k = (now - s.born) / 1000; this.fxG.fillStyle(s.c, 1 - (now - s.born) / FX.hitSpark.ms).fillCircle(s.x + s.vx * k, s.y + s.vy * k, FX.hitSpark.size); }
     this.drawDamageNumbers(now);
     if (AI_DEBUG) this.drawAIDebug();
-    const m = this.cur.match, me = this.cur.players.find(p => p.id === 'me'), mm = Math.floor(m.timeLeft / 60), ss = String(Math.floor(m.timeLeft % 60)).padStart(2, '0');
-    this.hud.setText(m.over ? `KAMP SLUT  ${m.score.blue} – ${m.score.red}` : `${m.score.blue}   ${mm}:${ss}   ${m.score.red}`);
-    this.hud2.setText(me.alive ? `HP ${me.hp}/${me.maxHp}   Ladninger ${me.charges}` : `Respawn om ${Math.max(0, me.respawnLeft).toFixed(1)} s`);
+    this.hudUI.draw(this.cur);
   }
   drawAIDebug() { // sti, mål og tilstand pr. bot (?aidebug=1)
     const g = this.fxG; this.aiTexts ??= new Map();
