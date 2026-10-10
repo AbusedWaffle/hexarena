@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader'] });
+const ctx = await b.newContext(); const pg = await ctx.newPage(); const bad = [];
+pg.on('response', r => r.status() >= 400 && bad.push(r.status() + ' ' + r.url())); pg.on('pageerror', e => bad.push('err ' + e.message));
+await pg.goto('http://localhost:8090/'); await pg.waitForTimeout(3000);
+const sw = await pg.evaluate(async () => { const r = await navigator.serviceWorker.ready; return r.active?.state; });
+const cdp = await ctx.newCDPSession(pg); const m = await cdp.send('Page.getAppManifest');
+const inst = await cdp.send('Page.getInstallabilityErrors').catch(e => ({ e: e.message }));
+await ctx.setOffline(true); await pg.reload(); await pg.waitForTimeout(3000);
+const off = await pg.evaluate(() => !!globalThis.__arena);
+console.log(JSON.stringify({ sw, manifestErrors: m.errors, inst, offlineGameRuns: off, bad }));
+await b.close();

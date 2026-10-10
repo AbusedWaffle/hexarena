@@ -1,0 +1,17 @@
+{
+  "name": "HexArena",
+  "short_name": "HexArena",
+  "description": "Top-down arena-shooter – singleplayer mod bots og multiplayer med spilkode.",
+  "lang": "da",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#06091A",
+  "theme_color": "#06091A",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
