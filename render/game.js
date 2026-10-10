@@ -15,7 +15,7 @@ class Arena extends Phaser.Scene {
     this.dummies = [0, 1, 2].map(i => addPlayer(this.world, { team: 'red', cls: 'Assault', id: 'dummy' + i }));
     this.prev = this.cur = snapshot(this.world); this.acc = 0;
     this.staticG = this.add.graphics(); this.drawMap();
-    this.g = this.add.graphics(); this.fxG = this.add.graphics();
+    this.g = this.add.graphics(); this.fxG = this.add.graphics(); this.ghosts = new Map(); this.pops = [];
     this.camTarget = this.add.zone(this.me.x, this.me.y, 1, 1);
     this.cameras.main.setBackgroundColor(hexStr(PALETTE.bg)).startFollow(this.camTarget, true, 0.15, 0.15);
     this.input_ = createDevInput(this, () => { const c = this.cameras.main; return { x: this.camTarget.x - c.worldView.x, y: this.camTarget.y - c.worldView.y }; });
@@ -48,6 +48,9 @@ class Arena extends Phaser.Scene {
       this.prev = this.cur; this.cur = snapshot(this.world);
       for (const e of this.cur.events) {
         if (e.type === 'crateDamaged' || e.type === 'crateBroken' || e.type === 'crateRespawned') redraw = true;
+        if (e.type === 'crateRespawnWarning') this.ghosts.set(e.q + ',' + e.r, { q: e.q, r: e.r, born: this.time.now });
+        if (e.type === 'crateRespawnCancelled') this.ghosts.delete(e.q + ',' + e.r);
+        if (e.type === 'crateRespawned') { this.ghosts.delete(e.q + ',' + e.r); this.pops.push({ q: e.q, r: e.r, born: this.time.now }); }
         if (e.type === 'shot' && e.hitscan) this.trails.push({ ...e, born: this.time.now });
         if (e.type === 'hit') {
           const d = this.dmg.get(e.id), now = this.time.now;
@@ -79,6 +82,9 @@ class Arena extends Phaser.Scene {
     if (aim && this.me.alive) { const r = raycast(this.world, this.me, aim, classes[this.me.cls].weapon.range * HEX_PX * Math.sqrt(3), { ignoreId: 'me', ignoreTeam: 'blue' }); g.lineStyle(3, PALETTE.blueGlow, 0.35).lineBetween(this.me.x, this.me.y, r.point.x, r.point.y); }
     for (const b of this.cur.projectiles) { const pb = this.prev.projectiles.find(q => q.id === b.id) || b; const x = lerp(pb.x, b.x), y = lerp(pb.y, b.y), c = b.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow; g.lineStyle(FX.bulletTrail.width, c, FX.bulletTrail.alpha).lineBetween(pb.x, pb.y, x, y).fillStyle(c).fillCircle(x, y, 3); }
     this.trails = this.trails.filter(t => now - t.born < FX.bulletTrail.ms);
+    for (const gh of this.ghosts.values()) { const a = FX.crateRespawn.ghostAlpha * (0.6 + 0.4 * Math.sin((now - gh.born) / FX.crateRespawn.pulseMs * 6.28)); const cs = hexCorners(gh.q, gh.r, HEX_PX * 0.78); this.fxG.fillStyle(PALETTE.crate, a).fillPoints(cs, true).lineStyle(2, PALETTE.crateEdge, a * 2).strokePoints(cs, true); }
+    this.pops = this.pops.filter(pp => now - pp.born < FX.crateRespawn.popMs);
+    for (const pp of this.pops) { const k = (now - pp.born) / FX.crateRespawn.popMs; this.fxG.lineStyle(3, PALETTE.crateEdge, 1 - k).strokePoints(hexCorners(pp.q, pp.r, HEX_PX * (0.78 + 0.25 * k)), true); }
     for (const t of this.trails) this.fxG.lineStyle(FX.bulletTrail.width, 0xffffff, 1 - (now - t.born) / FX.bulletTrail.ms).lineBetween(t.from.x, t.from.y, t.to.x, t.to.y);
     this.sparks = this.sparks.filter(s => now - s.born < FX.hitSpark.ms);
     for (const s of this.sparks) { const k = (now - s.born) / 1000; this.fxG.fillStyle(s.c, 1 - (now - s.born) / FX.hitSpark.ms).fillCircle(s.x + s.vx * k, s.y + s.vy * k, FX.hitSpark.size); }
