@@ -51,7 +51,7 @@
       "pierce": true,
       "durationSec": 5
     },
-    "radius": 0.35
+    "radius": 0.33
   },
   "Engineer": {
     "hp": 110,
@@ -76,7 +76,7 @@
       "crateHp": 80,
       "placeRange": 1
     },
-    "radius": 0.35
+    "radius": 0.38
   },
   "Scout": {
     "hp": 75,
@@ -101,7 +101,7 @@
       "distance": 3,
       "invulnSec": 0.25
     },
-    "radius": 0.35
+    "radius": 0.3
   },
   "Support": {
     "hp": 90,
