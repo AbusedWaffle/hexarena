@@ -1,0 +1,897 @@
+{
+ "id": "paintyard_01",
+ "name": "Paintyard",
+ "width": 15,
+ "height": 11,
+ "coords": "axial pointy-top, rektangel i odd-r offset",
+ "tiles": [
+  {
+   "q": 0,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 1,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 2,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 3,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 4,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 5,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 6,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 7,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 8,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 9,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 10,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 11,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 12,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 13,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 14,
+   "r": 0,
+   "type": "wall"
+  },
+  {
+   "q": 0,
+   "r": 1,
+   "type": "wall"
+  },
+  {
+   "q": 1,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 2,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 3,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 4,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 5,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 6,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 7,
+   "r": 1,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 8,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 9,
+   "r": 1,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 10,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 11,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 12,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 13,
+   "r": 1,
+   "type": "floor"
+  },
+  {
+   "q": 14,
+   "r": 1,
+   "type": "wall"
+  },
+  {
+   "q": -1,
+   "r": 2,
+   "type": "wall"
+  },
+  {
+   "q": 0,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 1,
+   "r": 2,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 2,
+   "r": 2,
+   "type": "wall"
+  },
+  {
+   "q": 3,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 4,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 5,
+   "r": 2,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 6,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 7,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 8,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 9,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 10,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 11,
+   "r": 2,
+   "type": "wall"
+  },
+  {
+   "q": 12,
+   "r": 2,
+   "type": "floor"
+  },
+  {
+   "q": 13,
+   "r": 2,
+   "type": "wall"
+  },
+  {
+   "q": -1,
+   "r": 3,
+   "type": "wall"
+  },
+  {
+   "q": 0,
+   "r": 3,
+   "type": "floor"
+  },
+  {
+   "q": 1,
+   "r": 3,
+   "type": "floor"
+  },
+  {
+   "q": 2,
+   "r": 3,
+   "type": "wall"
+  },
+  {
+   "q": 3,
+   "r": 3,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 4,
+   "r": 3,
+   "type": "floor"
+  },
+  {
+   "q": 5,
+   "r": 3,
+   "type": "floor"
+  },
+  {
+   "q": 6,
+   "r": 3,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 7,
+   "r": 3,
+   "type": "floor"
+  },
+  {
+   "q": 8,
+   "r": 3,
+   "type": "wall"
+  },
+  {
+   "q": 9,
+   "r": 3,
+   "type": "wall"
+  },
+  {
+   "q": 10,
+   "r": 3,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 11,
+   "r": 3,
+   "type": "floor"
+  },
+  {
+   "q": 12,
+   "r": 3,
+   "type": "floor"
+  },
+  {
+   "q": 13,
+   "r": 3,
+   "type": "wall"
+  },
+  {
+   "q": -2,
+   "r": 4,
+   "type": "wall"
+  },
+  {
+   "q": -1,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 0,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 1,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 2,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 3,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 4,
+   "r": 4,
+   "type": "wall"
+  },
+  {
+   "q": 5,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 6,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 7,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 8,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 9,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 10,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 11,
+   "r": 4,
+   "type": "floor"
+  },
+  {
+   "q": 12,
+   "r": 4,
+   "type": "wall"
+  },
+  {
+   "q": -2,
+   "r": 5,
+   "type": "wall"
+  },
+  {
+   "q": -1,
+   "r": 5,
+   "type": "floor"
+  },
+  {
+   "q": 0,
+   "r": 5,
+   "type": "floor"
+  },
+  {
+   "q": 1,
+   "r": 5,
+   "type": "floor"
+  },
+  {
+   "q": 2,
+   "r": 5,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 3,
+   "r": 5,
+   "type": "floor"
+  },
+  {
+   "q": 4,
+   "r": 5,
+   "type": "wall"
+  },
+  {
+   "q": 5,
+   "r": 5,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 6,
+   "r": 5,
+   "type": "wall"
+  },
+  {
+   "q": 7,
+   "r": 5,
+   "type": "floor"
+  },
+  {
+   "q": 8,
+   "r": 5,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 9,
+   "r": 5,
+   "type": "floor"
+  },
+  {
+   "q": 10,
+   "r": 5,
+   "type": "floor"
+  },
+  {
+   "q": 11,
+   "r": 5,
+   "type": "floor"
+  },
+  {
+   "q": 12,
+   "r": 5,
+   "type": "wall"
+  },
+  {
+   "q": -3,
+   "r": 6,
+   "type": "wall"
+  },
+  {
+   "q": -2,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": -1,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 0,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 1,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 2,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 3,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 4,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 5,
+   "r": 6,
+   "type": "wall"
+  },
+  {
+   "q": 6,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 7,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 8,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 9,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 10,
+   "r": 6,
+   "type": "floor"
+  },
+  {
+   "q": 11,
+   "r": 6,
+   "type": "wall"
+  },
+  {
+   "q": -3,
+   "r": 7,
+   "type": "wall"
+  },
+  {
+   "q": -2,
+   "r": 7,
+   "type": "floor"
+  },
+  {
+   "q": -1,
+   "r": 7,
+   "type": "floor"
+  },
+  {
+   "q": 0,
+   "r": 7,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 1,
+   "r": 7,
+   "type": "wall"
+  },
+  {
+   "q": 2,
+   "r": 7,
+   "type": "wall"
+  },
+  {
+   "q": 3,
+   "r": 7,
+   "type": "floor"
+  },
+  {
+   "q": 4,
+   "r": 7,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 5,
+   "r": 7,
+   "type": "floor"
+  },
+  {
+   "q": 6,
+   "r": 7,
+   "type": "floor"
+  },
+  {
+   "q": 7,
+   "r": 7,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 8,
+   "r": 7,
+   "type": "wall"
+  },
+  {
+   "q": 9,
+   "r": 7,
+   "type": "floor"
+  },
+  {
+   "q": 10,
+   "r": 7,
+   "type": "floor"
+  },
+  {
+   "q": 11,
+   "r": 7,
+   "type": "wall"
+  },
+  {
+   "q": -4,
+   "r": 8,
+   "type": "wall"
+  },
+  {
+   "q": -3,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": -2,
+   "r": 8,
+   "type": "wall"
+  },
+  {
+   "q": -1,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": 0,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": 1,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": 2,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": 3,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": 4,
+   "r": 8,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 5,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": 6,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": 7,
+   "r": 8,
+   "type": "wall"
+  },
+  {
+   "q": 8,
+   "r": 8,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 9,
+   "r": 8,
+   "type": "floor"
+  },
+  {
+   "q": 10,
+   "r": 8,
+   "type": "wall"
+  },
+  {
+   "q": -4,
+   "r": 9,
+   "type": "wall"
+  },
+  {
+   "q": -3,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": -2,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": -1,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 0,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 1,
+   "r": 9,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 2,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 3,
+   "r": 9,
+   "type": "crate",
+   "hp": 100
+  },
+  {
+   "q": 4,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 5,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 6,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 7,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 8,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 9,
+   "r": 9,
+   "type": "floor"
+  },
+  {
+   "q": 10,
+   "r": 9,
+   "type": "wall"
+  },
+  {
+   "q": -5,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": -4,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": -3,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": -2,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": -1,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 0,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 1,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 2,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 3,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 4,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 5,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 6,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 7,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 8,
+   "r": 10,
+   "type": "wall"
+  },
+  {
+   "q": 9,
+   "r": 10,
+   "type": "wall"
+  }
+ ],
+ "spawns": {
+  "blue": [
+   {
+    "q": 0,
+    "r": 3
+   },
+   {
+    "q": -1,
+    "r": 5
+   },
+   {
+    "q": -2,
+    "r": 7
+   },
+   {
+    "q": 0,
+    "r": 4
+   },
+   {
+    "q": -1,
+    "r": 6
+   }
+  ],
+  "red": [
+   {
+    "q": 10,
+    "r": 7
+   },
+   {
+    "q": 11,
+    "r": 5
+   },
+   {
+    "q": 12,
+    "r": 3
+   },
+   {
+    "q": 9,
+    "r": 6
+   },
+   {
+    "q": 10,
+    "r": 4
+   }
+  ]
+ }
+}
