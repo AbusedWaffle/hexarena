@@ -40,12 +40,13 @@ export const FX = {
   },
 };
 
-// Enheder: kun cirkler og trekanter, som i mockuppen.
-// Trekanter peger i sigteretningen. Klassen ses på form + størrelse.
+// Enheder: én unik silhuet pr. klasse, holdfarven sidder på fyldet.
+// Former tegnes af drawUnit() i art/shapes.js og roteres efter sigteretningen.
+// pts = polygon i enheds-koordinater (radius 1, næsen peger mod +x).
 export const SHAPES = {
-  assault:  { shape: 'circle',   radius: 1.0 },
-  support:  { shape: 'circle',   radius: 1.0, mark: 'plus' },
-  engineer: { shape: 'circle',   radius: 1.15, ring: true },
-  sniper:   { shape: 'triangle', radius: 1.1, aspect: 0.6 }, // smal
-  scout:    { shape: 'triangle', radius: 0.85 },
+  assault:  { shape: 'circle',   nose: true },                       // allround: cirkel
+  sniper:   { shape: 'needle',   pts: [[1.6,0],[-0.6,0.55],[-0.9,0],[-0.6,-0.55]] }, // lang spids pil
+  engineer: { shape: 'square',   pts: [[0.85,0.85],[-0.85,0.85],[-0.85,-0.85],[0.85,-0.85]], nose: true }, // kasse/bygger
+  scout:    { shape: 'triangle', pts: [[1.25,0],[-0.75,0.8],[-0.4,0],[-0.75,-0.8]] }, // hurtig chevron
+  support:  { shape: 'cross',    pts: [[0.35,1],[-0.35,1],[-0.35,0.35],[-1,0.35],[-1,-0.35],[-0.35,-0.35],[-0.35,-1],[0.35,-1],[0.35,-0.35],[1,-0.35],[1,0.35],[0.35,0.35]], nose: true, noRotate: true }, // plus
 };

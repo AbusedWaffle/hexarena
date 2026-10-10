@@ -1,4 +1,5 @@
 import { PALETTE, FX } from '../art/palette.js';
+import { drawUnit } from '../art/shapes.js';
 import { HEX_PX, hexCorners, hexToPixel } from '../sim/hex.js';
 import { createWorld, addPlayer, step, snapshot, raycast, DT } from '../sim/world.js';
 import { createDevInput } from './devInput.js';
@@ -69,7 +70,7 @@ class Arena extends Phaser.Scene {
       const pp = this.prev.players.find(q => q.id === p.id) || p; if (!p.alive) continue;
       const x = lerp(pp.x, p.x), y = lerp(pp.y, p.y), col = p.team === 'blue' ? PALETTE.blue : PALETTE.red, glow = p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, r = HEX_PX * 0.2;
       if (p.id === 'me') { this.camTarget.setPosition(x, y); g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5); }
-      g.fillStyle(glow, FX.glowAlpha * 0.5).fillCircle(x, y, r + 4).fillStyle(col).fillCircle(x, y, r);
+      drawUnit(g, classes[p.cls]?.shape, x, y, r, Math.atan2(p.aim?.y || 0, p.aim?.x || 1), col, glow);
       if (p.spawnShieldLeft > 0) g.lineStyle(2, glow, FX.spawnShield.alpha + 0.3 * Math.sin(now / FX.spawnShield.pulseMs * 6.28)).strokeCircle(x, y, r + 9);
       g.fillStyle(0x000000, 0.6).fillRect(x - 18, y - r - 14, 36, 4).fillStyle(col).fillRect(x - 18, y - r - 14, 36 * p.hp / p.maxHp, 4);
       if (p.id === 'me') for (let i = 0; i < classes.Assault.weapon.charges; i++) { const f = i < p.charges ? 1 : i === p.charges ? p.chargeProgress : 0; g.fillStyle(0x000000, 0.6).fillRect(x - 18 + i * 12.5, y + r + 8, 11, 3).fillStyle(PALETTE.score).fillRect(x - 18 + i * 12.5, y + r + 8, 11 * f, 3); }
