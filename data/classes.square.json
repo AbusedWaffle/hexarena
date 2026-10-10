@@ -1,0 +1,148 @@
+{
+  "_note": "Kvadratisk grid: afstande i tiles (1 tile ≈ ½ tidligere hex), tid i sekunder. Én ladning = én salve. projectileSpeed 0 = hitscan. shape peger på SHAPES i art/palette.js.",
+  "Assault": {
+    "hp": 100,
+    "speed": 6.0,
+    "shape": "assault",
+    "weapon": {
+      "damage": 12,
+      "charges": 3,
+      "rechargeSec": 1.2,
+      "shotsPerCharge": 4,
+      "shotIntervalMs": 120,
+      "fireCooldownSec": 0.5,
+      "range": 12.0,
+      "projectileSpeed": 28.0,
+      "pellets": 1,
+      "spreadDeg": 4,
+      "autoAimSpreadDeg": 10
+    },
+    "ability": {
+      "id": "grenade",
+      "cooldownSec": 8,
+      "damage": 40,
+      "radius": 2.0,
+      "throwRange": 10.0,
+      "fuseSec": 0.6
+    },
+    "radius": 0.42
+  },
+  "Sniper": {
+    "hp": 70,
+    "speed": 5.4,
+    "shape": "sniper",
+    "weapon": {
+      "damage": 60,
+      "charges": 2,
+      "rechargeSec": 2.0,
+      "shotsPerCharge": 1,
+      "shotIntervalMs": 0,
+      "fireCooldownSec": 1.2,
+      "range": 18.0,
+      "projectileSpeed": 0.0,
+      "pellets": 1,
+      "spreadDeg": 0,
+      "autoAimSpreadDeg": 10
+    },
+    "ability": {
+      "id": "focus",
+      "cooldownSec": 10,
+      "damageMult": 1.5,
+      "pierce": true,
+      "durationSec": 5
+    },
+    "radius": 0.4
+  },
+  "Engineer": {
+    "hp": 110,
+    "speed": 5.2,
+    "shape": "engineer",
+    "weapon": {
+      "damage": 8,
+      "charges": 3,
+      "rechargeSec": 1.5,
+      "shotsPerCharge": 1,
+      "shotIntervalMs": 0,
+      "fireCooldownSec": 1.0,
+      "range": 7.0,
+      "projectileSpeed": 24.0,
+      "pellets": 5,
+      "spreadDeg": 30,
+      "autoAimSpreadDeg": 10
+    },
+    "ability": {
+      "id": "deploy_crate",
+      "cooldownSec": 12,
+      "crateHp": 80,
+      "placeRange": 1
+    },
+    "radius": 0.46
+  },
+  "Scout": {
+    "hp": 75,
+    "speed": 7.6,
+    "shape": "scout",
+    "weapon": {
+      "damage": 7,
+      "charges": 3,
+      "rechargeSec": 1.0,
+      "shotsPerCharge": 6,
+      "shotIntervalMs": 90,
+      "fireCooldownSec": 0.35,
+      "range": 9.0,
+      "projectileSpeed": 32.0,
+      "pellets": 1,
+      "spreadDeg": 8,
+      "autoAimSpreadDeg": 10
+    },
+    "ability": {
+      "id": "dash",
+      "cooldownSec": 5,
+      "distance": 6.0,
+      "invulnSec": 0.25
+    },
+    "radius": 0.36
+  },
+  "Support": {
+    "hp": 90,
+    "speed": 6.0,
+    "shape": "support",
+    "weapon": {
+      "damage": 15,
+      "charges": 3,
+      "rechargeSec": 1.0,
+      "shotsPerCharge": 2,
+      "shotIntervalMs": 180,
+      "fireCooldownSec": 0.4,
+      "range": 12.0,
+      "projectileSpeed": 28.0,
+      "pellets": 1,
+      "spreadDeg": 3,
+      "autoAimSpreadDeg": 10
+    },
+    "ability": {
+      "id": "heal_zone",
+      "cooldownSec": 12,
+      "healPerSec": 15,
+      "radius": 3.0,
+      "durationSec": 4
+    },
+    "radius": 0.42
+  },
+  "_match": {
+    "mode": "tdm",
+    "durationSec": 150,
+    "killTarget": 15,
+    "respawnSec": 3,
+    "spawnShieldSec": 1.5,
+    "crateHp": 150,
+    "maxPlayers": 8,
+    "maxPerTeam": 4,
+    "crateRespawnSec": 25,
+    "crateRespawnBlockRadius": 1
+  },
+  "_ai": {
+    "maxRetreatingPerTeam": 1,
+    "visionRange": 16
+  }
+}
