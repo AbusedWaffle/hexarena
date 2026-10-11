@@ -67,7 +67,7 @@
       "range": 8,
       "projectileSpeed": 24.0,
       "pellets": 5,
-      "spreadDeg": 30,
+      "spreadDeg": 20,
       "autoAimSpreadDeg": 10
     },
     "ability": {
@@ -79,17 +79,17 @@
     "radius": 0.42
   },
   "Scout": {
-    "hp": 85,
+    "hp": 95,
     "speed": 8.0,
     "shape": "scout",
     "weapon": {
-      "damage": 9,
+      "damage": 10,
       "charges": 3,
       "rechargeSec": 1.0,
       "shotsPerCharge": 6,
       "shotIntervalMs": 90,
       "fireCooldownSec": 0.35,
-      "range": 11,
+      "range": 8,
       "projectileSpeed": 32.0,
       "pellets": 1,
       "spreadDeg": 8,
@@ -97,7 +97,7 @@
     },
     "ability": {
       "id": "dash",
-      "cooldownSec": 5,
+      "cooldownSec": 4,
       "distance": 6.0,
       "invulnSec": 0.25
     },
