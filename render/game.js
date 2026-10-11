@@ -85,7 +85,7 @@ class Arena extends Phaser.Scene {
         this.net?.publish(this.cur);
       }
       for (const e of this.cur.events) {
-        this.abilityFx.onEvent(e, this.cur);
+        this.abilityFx.onEvent(e, this.cur); this.hudUI.onEvent(e, this.cur);
         if (e.type === 'crateDeployed') redraw = true;
         if (e.type === 'crateDamaged' || e.type === 'crateBroken' || e.type === 'crateRespawned') redraw = true;
         if (e.type === 'crateRespawnWarning') this.ghosts.set(e.x + ',' + e.y, { x: e.x, y: e.y, born: this.time.now });
