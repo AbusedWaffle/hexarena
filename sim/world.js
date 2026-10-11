@@ -133,20 +133,44 @@ export function predictMove(w, p, cls, move) {
   const v = w.classes[cls].speed * U * DT * ml; moveBy(w, p, m.x / mn * v, m.y / mn * v);
 }
 
-function autoAimTarget(w, p, rangePx) {
+// Auto-aim (data i _autoAim): kun mål med synslinje inden for rækkevidde. Foretrækker mål i den retning, man går (preferInAimDirDeg),
+// derefter nærmeste og med lowHpBias mål med lidt liv. Et valgt mål fastholdes i targetStickySec, så sigtet ikke hopper.
+export function autoAimPick(w, p, rangePx, now = w.tick * DT) {
+  const A = w.classes._autoAim || {}, prefer = (A.preferInAimDirDeg ?? 60) * Math.PI / 180, cone = (A.coneDeg ?? 360) * Math.PI / 180;
+  const valid = (e) => e && e.alive && e.team !== p.team && Math.hypot(e.x - p.x, e.y - p.y) <= rangePx && (A.requireLineOfSight === false || hasLineOfSight(w, p, e));
+  const cur = p.autoTargetId && w.players.find(e => e.id === p.autoTargetId);
+  if (cur && valid(cur) && now - (p.autoTargetSince ?? -1e9) < (A.targetStickySec ?? 0.6)) return cur;
+  const dir = p.moveDir && Math.hypot(p.moveDir.x, p.moveDir.y) > 0.1 ? p.moveDir : p.aim, da = Math.atan2(dir.y, dir.x);
   let best = null;
   for (const e of w.players) {
-    if (!e.alive || e.team === p.team) continue;
-    const d = Math.hypot(e.x - p.x, e.y - p.y);
-    if (d <= rangePx && (!best || d < best.d) && hasLineOfSight(w, p, e)) best = { e, d };
+    if (!valid(e)) continue;
+    const d = Math.hypot(e.x - p.x, e.y - p.y), ang = Math.abs(((Math.atan2(e.y - p.y, e.x - p.x) - da + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+    if (ang > cone / 2) continue;
+    const score = d / rangePx + (ang > prefer ? 0.5 : 0) + (A.lowHpBias ?? 0) * (e.hp / e.maxHp);
+    if (!best || score < best.score) best = { e, score };
   }
-  return best && best.e;
+  const t = best && best.e;
+  if ((t && t.id) !== (cur && cur.id)) p.autoTargetSince = now;
+  p.autoTargetId = t ? t.id : null;
+  return t;
+}
+function autoAimTarget(w, p, rangePx) { return autoAimPick(w, p, rangePx); }
+// Sigtepunkt med lead: hvor målet er, når skuddet når frem (projectileSpeed 0 = hitscan, ingen lead)
+function leadPoint(w, p, t, wp) {
+  const A = w.classes._autoAim || {}, k = A.leadTarget ?? 0;
+  if (!k || !wp.projectileSpeed || !t.vx && !t.vy) return { x: t.x, y: t.y };
+  const tt = Math.hypot(t.x - p.x, t.y - p.y) / (wp.projectileSpeed * U);
+  return { x: t.x + t.vx * tt * k, y: t.y + t.vy * tt * k };
 }
 
 const rad = (deg) => deg * Math.PI / 180, rnd = (s) => (Math.random() * 2 - 1) * s;
 
 function fireShot(w, p) {
   const wp = w.classes[p.cls].weapon, s = p.salvo;
+  if (s.auto && s.targetId) { // auto-salve følger målet skud for skud (med lead), så hele salven ikke går, hvor målet var
+    const t = w.players.find(e => e.id === s.targetId);
+    if (t && t.alive && hasLineOfSight(w, p, t)) { const lp = leadPoint(w, p, t, wp); s.dir = { x: lp.x - p.x, y: lp.y - p.y }; p.aim = s.dir; }
+  }
   for (let i = 0; i < wp.pellets; i++) {
     const spread = rad(s.auto ? wp.autoAimSpreadDeg : wp.spreadDeg);
     const a = Math.atan2(s.dir.y, s.dir.x) + (wp.pellets > 1 ? spread * (i / (wp.pellets - 1) - 0.5) + rnd(spread * 0.1) : rnd(spread / 2));
@@ -320,15 +344,18 @@ export function step(w, inputs) {
     p.lastSeq = inp.seq ?? p.lastSeq;
     const m = inp.move || { x: 0, y: 0 }, ml = Math.min(1, Math.hypot(m.x, m.y)), mn = Math.hypot(m.x, m.y) || 1;
     const v = c.speed * U * DT * ml;
+    const x0 = p.x, y0 = p.y;
     moveBy(w, p, m.x / mn * v, m.y / mn * v);
+    p.vx = (p.x - x0) / DT; p.vy = (p.y - y0) / DT; p.moveDir = ml > 0.1 ? { x: m.x / mn, y: m.y / mn } : null;
     if (inp.aim && Math.hypot(inp.aim.x, inp.aim.y) > 0.01) p.aim = { x: inp.aim.x, y: inp.aim.y };
+    autoAimPick(w, p, wp.range * U); // opdaterer autoTargetId hvert tick (HUD viser det mål, et tap rammer)
     if (inp.fire && !p.salvo && p.charges > 0 && p.fireCooldownLeft === 0) {
       let dir = inp.aim, auto = false;
-      if (!dir) { const t = autoAimTarget(w, p, wp.range * U); dir = t ? { x: t.x - p.x, y: t.y - p.y } : p.aim; auto = true; }
+      if (!dir) { const t = autoAimTarget(w, p, wp.range * U); const lp = t && leadPoint(w, p, t, wp); dir = t ? { x: lp.x - p.x, y: lp.y - p.y } : p.aim; auto = true; }
       p.aim = dir; p.charges--; p.fireCooldownLeft = wp.fireCooldownSec; p.spawnShieldLeft = 0;
       const ab = c.ability, focus = p.focusLeft > 0 && ab?.id === 'focus' ? { damageMult: ab.damageMult, pierce: ab.pierce } : null;
       if (focus) p.focusLeft = 0; // Fokus bruges af næste salve
-      p.salvo = { dir, auto, left: wp.shotsPerCharge, next: 0, focus };
+      p.salvo = { dir, auto, left: wp.shotsPerCharge, next: 0, focus, targetId: auto ? p.autoTargetId : null };
     }
     if (inp.ability && p.abilityCooldownLeft === 0 && c.ability && useAbility(w, p, inp)) { p.abilityCooldownLeft = c.ability.cooldownSec; p.spawnShieldLeft = 0; w.events.push({ type: 'ability', id: p.id, ability: c.ability.id }); }
   }
@@ -365,7 +392,7 @@ export function step(w, inputs) {
 export function snapshot(w) {
   return { tick: w.tick, match: { mode: w.match.mode, score: { ...w.match.score }, round: w.match.round, roundIntroLeft: w.match.roundIntroLeft, timeLeft: w.match.timeLeft, over: w.match.over },
     players: w.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, radius: p.radius, x: p.x, y: p.y, aim: p.aim, alive: p.alive, hp: p.hp, maxHp: p.maxHp,
-      charges: p.charges, chargeProgress: p.chargeProgress, abilityCooldownLeft: p.abilityCooldownLeft, spawnShieldLeft: p.spawnShieldLeft, invulnLeft: p.invulnLeft, focusLeft: p.focusLeft, respawnLeft: p.respawnLeft, lastSeq: p.lastSeq })),
+      charges: p.charges, chargeProgress: p.chargeProgress, abilityCooldownLeft: p.abilityCooldownLeft, spawnShieldLeft: p.spawnShieldLeft, invulnLeft: p.invulnLeft, focusLeft: p.focusLeft, respawnLeft: p.respawnLeft, autoTargetId: p.autoTargetId ?? null, lastSeq: p.lastSeq })),
     projectiles: w.projectiles.map(b => ({ id: b.id, team: b.team, x: b.x, y: b.y })),
     grenades: w.grenades.map(g => ({ id: g.id, team: g.team, from: g.from, x: g.x, y: g.y, fuse: g.fuse, fuseSec: g.fuseSec, radius: g.radius })),
     zones: w.zones.map(z => ({ id: z.id, team: z.team, x: z.x, y: z.y, radius: z.radius, left: z.left })), events: w.events };

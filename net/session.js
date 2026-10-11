@@ -1,5 +1,6 @@
 // Host- og klient-session oven på et Transport. Hosten kører step() og er autoritativ; klienten spejler state og forudsiger egen bevægelse.
-import { createWorld, addPlayer, setClass, predictMove } from '../sim/world.js';
+import { createWorld, addPlayer, setClass, predictMove, autoAimPick } from '../sim/world.js';
+import { TILE_PX } from '../sim/grid.js';
 import { encodeSnap, decodeSnap, rosterOf, remapEvent } from './codec.js';
 
 const INPUT_REDUNDANCY = 3; // hvert input-pakke bærer de sidste 3 frames, så tabte pakker ikke taber skud
@@ -134,12 +135,13 @@ export function createClientSession(transport, opts) {
       pending.push(f); if (pending.length > 60) pending.shift();
       const me = world.players.find(p => p.id === 'me');
       const frozen = view && view.match.roundIntroLeft > 0; // nedtælling: hosten flytter ingen
+      if (me) { const ml = Math.hypot(f.move?.x || 0, f.move?.y || 0); me.moveDir = ml > 0.1 ? { x: f.move.x / ml, y: f.move.y / ml } : null; }
       if (me && me.alive && !frozen) { predictMove(world, me, me.cls, f.move); if (f.aim) me.aim = f.aim; }
       transport.send('host', 'u', { t: 'in', f: pending.slice(-INPUT_REDUNDANCY) });
     },
     view() { // snapshot til render/HUD; egen spiller fra prediction
       if (!view) return null;
-      const players = view.players.map(p => { if (p.id !== 'me') return p; const me = world.players.find(q => q.id === 'me'); return { ...p, x: me.x, y: me.y, aim: me.aim }; });
+      const players = view.players.map(p => { if (p.id !== 'me') return p; const me = world.players.find(q => q.id === 'me'); const t = me.alive ? autoAimPick(world, me, world.classes[me.cls].weapon.range * TILE_PX) : null; return { ...p, x: me.x, y: me.y, aim: me.aim, autoTargetId: t ? t.id : null }; });
       const ev = eventQueue; eventQueue = [];
       return { ...view, players, events: ev };
     },
