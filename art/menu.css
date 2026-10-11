@@ -1,0 +1,21 @@
+/* HexArena menu-stil: samme mørke palet og glød som spillet. Frontend kan importere og bruge klasserne direkte. */
+:root {
+  --ha-bg: #06091A; --ha-panel: #0B1230; --ha-line: #1B2139; --ha-edge: #3A4A75;
+  --ha-text: #F2F5FF; --ha-dim: #8A93B5; --ha-score: #FFE27A;
+  --ha-blue: #2563E8; --ha-blue-glow: #6FA0FF; --ha-red: #DC261B; --ha-red-glow: #FF7A6E;
+  --ha-radius: 14px; --ha-font: "Roboto Mono", ui-monospace, monospace;
+}
+.ha-screen { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 30%, #0E1638 0%, var(--ha-bg) 70%); color: var(--ha-text); font-family: var(--ha-font); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+.ha-title { font-size: 48px; font-weight: 800; letter-spacing: 4px; text-shadow: 0 0 18px var(--ha-blue-glow); }
+.ha-btn { min-width: 260px; min-height: 56px; padding: 0 24px; border-radius: var(--ha-radius); border: 2px solid var(--ha-edge); background: var(--ha-panel); color: var(--ha-text); font: 700 20px var(--ha-font); letter-spacing: 1px; }
+.ha-btn.primary { border-color: var(--ha-blue-glow); background: var(--ha-blue); box-shadow: 0 0 18px rgba(111,160,255,.45); }
+.ha-btn:active { transform: scale(.97); }
+.ha-cards { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.ha-card { width: 150px; padding: 12px; border-radius: var(--ha-radius); border: 2px solid var(--ha-line); background: var(--ha-panel); text-align: center; }
+.ha-card img { width: 72px; height: 72px; }
+.ha-card.selected { border-color: var(--ha-blue-glow); box-shadow: 0 0 16px rgba(111,160,255,.5); }
+.ha-card .name { font-weight: 800; font-size: 16px; } .ha-card .role { color: var(--ha-dim); font-size: 12px; margin-bottom: 6px; }
+.ha-stat { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ha-dim); }
+.ha-stat .bar { flex: 1; display: flex; gap: 2px; } .ha-stat .bar i { flex: 1; height: 5px; border-radius: 2px; background: var(--ha-line); }
+.ha-stat .bar i.on { background: var(--ha-score); }
+.ha-seg { display: flex; gap: 6px; } .ha-seg button { flex: 1; min-width: 0; } /* sværhedsgrad / holdstørrelse */

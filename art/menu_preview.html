@@ -1,0 +1,7 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="menu.css"></head><body>
+<div class="ha-screen"><div class="ha-title">HEXARENA</div><div class="ha-cards" id="c"></div>
+<div class="ha-seg" style="width:520px"><button class="ha-btn">Let</button><button class="ha-btn primary">Normal</button><button class="ha-btn">Svær</button></div>
+<button class="ha-btn primary">Start</button></div>
+<script>
+fetch('../data/menu.json').then(r=>r.json()).then(m=>{document.getElementById('c').innerHTML=m.classes.map((k,i)=>`<div class="ha-card ${i==0?'selected':''}"><img src="icons/${k.id.toLowerCase()}_${i==0?'blue':'neutral'}.svg"><div class="name">${k.name}</div><div class="role">${k.role}</div>${Object.entries(k.stats).map(([s,v])=>`<div class="ha-stat"><span style="width:62px;text-align:left">${s}</span><span class="bar">${[1,2,3,4,5].map(n=>`<i class="${n<=v?'on':''}"></i>`).join('')}</span></div>`).join('')}</div>`).join('');document.title='READY'});
+</script></body></html>
