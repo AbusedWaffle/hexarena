@@ -15,7 +15,7 @@
       "projectileSpeed": 28.0,
       "pellets": 1,
       "spreadDeg": 4,
-      "autoAimSpreadDeg": 10
+      "autoAimSpreadDeg": 4
     },
     "ability": {
       "id": "grenade",
@@ -42,7 +42,7 @@
       "projectileSpeed": 0.0,
       "pellets": 1,
       "spreadDeg": 0,
-      "autoAimSpreadDeg": 10
+      "autoAimSpreadDeg": 4
     },
     "ability": {
       "id": "focus",
@@ -68,7 +68,7 @@
       "projectileSpeed": 24.0,
       "pellets": 5,
       "spreadDeg": 20,
-      "autoAimSpreadDeg": 10
+      "autoAimSpreadDeg": 4
     },
     "ability": {
       "id": "deploy_crate",
@@ -93,7 +93,7 @@
       "projectileSpeed": 32.0,
       "pellets": 1,
       "spreadDeg": 8,
-      "autoAimSpreadDeg": 10
+      "autoAimSpreadDeg": 4
     },
     "ability": {
       "id": "dash",
@@ -118,7 +118,7 @@
       "projectileSpeed": 28.0,
       "pellets": 1,
       "spreadDeg": 3,
-      "autoAimSpreadDeg": 10
+      "autoAimSpreadDeg": 4
     },
     "ability": {
       "id": "heal_zone",
@@ -161,5 +161,13 @@
   "_ai": {
     "maxRetreatingPerTeam": 1,
     "visionRange": 16
+  },
+  "_autoAim": {
+    "coneDeg": 360,
+    "preferInAimDirDeg": 60,
+    "targetStickySec": 0.6,
+    "leadTarget": 0.8,
+    "lowHpBias": 0.3,
+    "requireLineOfSight": true
   }
 }
