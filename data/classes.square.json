@@ -5,7 +5,7 @@
     "speed": 3.0,
     "shape": "assault",
     "weapon": {
-      "damage": 10,
+      "damage": 9,
       "charges": 3,
       "rechargeSec": 1.4,
       "shotsPerCharge": 4,
@@ -79,11 +79,11 @@
     "radius": 0.42
   },
   "Scout": {
-    "hp": 95,
+    "hp": 105,
     "speed": 3.8,
     "shape": "scout",
     "weapon": {
-      "damage": 10,
+      "damage": 11,
       "charges": 3,
       "rechargeSec": 1.0,
       "shotsPerCharge": 6,
