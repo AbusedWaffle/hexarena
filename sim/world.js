@@ -3,14 +3,20 @@ import { TILE_PX, DIRS4, DIRS8, key, tileToPixel, pixelToTile } from './grid.js'
 const U = TILE_PX; // 1 tile i px
 export const TICK_HZ = 20, DT = 1 / TICK_HZ;
 const PLAYER_RADIUS = 0.4; // tiles, fallback hvis klassen ikke har radius
-const CRATE_WARN_SEC = 1.5; // varsel før kasse-respawn (matcher FX.crateRespawn)
+const CRATE_WARN_SEC = 1.5;
+const ROUND_END_SEC = 2.5; // resultat vises, før næste runde nulstilles (matcher HUD) // varsel før kasse-respawn (matcher FX.crateRespawn)
 
 export function createWorld(map, classes) {
   const tiles = new Map(), crateHp = classes._match.crateHp ?? 100;
   for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) tiles.set(key(x, y), { x, y, type: 'floor', hp: 0, maxHp: crateHp });
   for (const t of map.tiles) { const c = tiles.get(key(t.x, t.y)); if (!c) continue; c.type = t.type; if (t.type === 'crate') c.hp = crateHp; }
   return { map, classes, tiles, players: [], projectiles: [], grenades: [], zones: [], events: [], tick: 0,
-    match: { score: { blue: 0, red: 0 }, timeLeft: classes._match.durationSec, over: false }, nextId: 1 };
+    match: newMatch(classes._match), nextId: 1 };
+}
+// Kamp-tilstand. knockout: runder uden respawn, først til roundsToWin. tdm: respawn, først til killTarget eller tiden.
+function newMatch(m) {
+  if (m.mode === 'knockout') return { mode: 'knockout', score: { blue: 0, red: 0 }, round: 1, roundIntroLeft: m.roundIntroSec ?? 3, timeLeft: m.roundTimeSec ?? 75, roundEndLeft: 0, over: false };
+  return { mode: 'tdm', score: { blue: 0, red: 0 }, round: 1, roundIntroLeft: 0, timeLeft: m.durationSec, roundEndLeft: 0, over: false };
 }
 
 export function addPlayer(w, { team, cls, id }) {
@@ -171,11 +177,15 @@ function damagePlayer(w, ownerId, t, damage, extra = {}) {
   t.hp = Math.max(0, t.hp - damage); t.lastDamageAt = w.tick * DT;
   w.events.push({ type: 'hit', id: t.id, by: ownerId, damage, x: t.x, y: t.y, hp: t.hp, ...extra });
   if (t.hp <= 0) {
-    t.alive = false; t.deaths++; t.respawnLeft = w.classes._match.respawnSec;
+    const ko = w.match.mode === 'knockout';
+    t.alive = false; t.deaths++; t.respawnLeft = ko && !w.classes._match.respawnInRound ? Infinity : w.classes._match.respawnSec;
     const k = w.players.find(q => q.id === ownerId); if (k && k.team !== t.team) k.kills++;
-    w.match.score[k && k.team !== t.team ? k.team : (t.team === 'blue' ? 'red' : 'blue')]++;
+    if (!ko) w.match.score[k && k.team !== t.team ? k.team : (t.team === 'blue' ? 'red' : 'blue')]++;
     w.events.push({ type: 'kill', id: t.id, by: ownerId, x: t.x, y: t.y, score: { ...w.match.score } });
-    if (w.match.score.blue >= w.classes._match.killTarget || w.match.score.red >= w.classes._match.killTarget) endMatch(w);
+    if (ko) { // runden slutter, når et hold er helt ude
+      const alive = (team) => w.players.some(q => q.team === team && q.alive);
+      if (!alive('blue') || !alive('red')) endRound(w, alive('blue') ? 'blue' : alive('red') ? 'red' : 'draw', 'eliminated');
+    } else if (w.match.score.blue >= w.classes._match.killTarget || w.match.score.red >= w.classes._match.killTarget) endMatch(w);
   }
 }
 function damageCrate(w, t, damage) {
@@ -251,15 +261,54 @@ function stepAbilities(w) {
   w.zones = w.zones.filter(z => z.left > 0);
 }
 
+function endRound(w, winner, reason) {
+  const m = w.match; if (m.over || m.roundEndLeft > 0) return;
+  if (winner !== 'draw') m.score[winner]++;
+  m.roundEndLeft = ROUND_END_SEC;
+  w.events.push({ type: 'roundEnd', round: m.round, winner, reason, score: { ...m.score } });
+  if (m.score.blue >= (w.classes._match.roundsToWin ?? 3) || m.score.red >= (w.classes._match.roundsToWin ?? 3)) endMatch(w);
+}
+function timeoutWinner(w) { // flest levende, derefter mest samlet liv
+  const n = (t) => w.players.filter(p => p.team === t && p.alive).length, hp = (t) => w.players.filter(p => p.team === t && p.alive).reduce((a, p) => a + p.hp, 0);
+  return n('blue') !== n('red') ? (n('blue') > n('red') ? 'blue' : 'red') : hp('blue') !== hp('red') ? (hp('blue') > hp('red') ? 'blue' : 'red') : 'draw';
+}
+// Ny runde: alle tilbage til eget spawn med fuldt liv, ladninger og nulstillede abilities; banens kasser gendannes.
+function resetRound(w) {
+  const m = w.match, mc = w.classes._match;
+  m.round++; m.roundEndLeft = 0; m.roundIntroLeft = mc.roundIntroSec ?? 3; m.timeLeft = mc.roundTimeSec ?? 75;
+  w.projectiles = []; w.grenades = []; w.zones = [];
+  const orig = new Set(w.map.tiles.filter(t => t.type === 'crate').map(t => key(t.x, t.y)));
+  for (const t of w.tiles.values()) {
+    const k = key(t.x, t.y), was = t.type === 'crate';
+    if (t.type === 'wall') continue;
+    t.deployedBy = null; t.wasCrate = false; t.warnLeft = null;
+    if (orig.has(k)) { t.type = 'crate'; t.hp = t.maxHp = mc.crateHp ?? 100; if (!was || t.hp !== t.maxHp) w.events.push({ type: 'crateRespawned', x: t.x, y: t.y }); }
+    else if (was) { t.type = 'floor'; t.hp = 0; w.events.push({ type: 'crateBroken', x: t.x, y: t.y }); }
+  }
+  for (const team of ['blue', 'red']) w.players.filter(p => p.team === team).forEach((p, i) => {
+    const sp = w.map.spawns[team][i % w.map.spawns[team].length], px = tileToPixel(sp.x, sp.y), wp = w.classes[p.cls].weapon;
+    Object.assign(p, { x: px.x, y: px.y, hp: p.maxHp, alive: true, respawnLeft: 0, charges: wp.charges, chargeProgress: 0, salvo: null, fireCooldownLeft: 0,
+      abilityCooldownLeft: 0, focusLeft: 0, invulnLeft: 0, spawnShieldLeft: 0, deployedCrate: null, lastDamageAt: -1e9, aim: { x: team === 'blue' ? -1 : 1, y: 0 } });
+  });
+  w.events.push({ type: 'roundStart', round: m.round, introSec: m.roundIntroLeft, score: { ...m.score } });
+}
+
 function endMatch(w) { if (!w.match.over) { w.match.over = true; const s = w.match.score; w.events.push({ type: 'matchOver', winner: s.blue === s.red ? 'draw' : s.blue > s.red ? 'blue' : 'red', score: { ...s } }); } }
 
 // inputs: { [playerId]: InputFrame }  InputFrame = { move:{x,y}, aim:{x,y}|null, fire, ability, seq }
 export function step(w, inputs) {
   w.events = []; w.tick++;
-  if (!w.match.over) { w.match.timeLeft = Math.max(0, w.match.timeLeft - DT); if (w.match.timeLeft === 0) endMatch(w); }
+  const m = w.match;
+  const ackInputs = () => { for (const p of w.players) { const f = inputs[p.id]; if (f && f.seq != null) p.lastSeq = f.seq; } }; // også når alle står stille, så klientens prediction ikke hober sig op
+  if (m.mode === 'knockout' && !m.over) {
+    if (m.roundEndLeft > 0) { m.roundEndLeft -= DT; if (m.roundEndLeft <= 0) resetRound(w); ackInputs(); return; } // pause mellem runder
+    if (m.roundIntroLeft > 0) { if (w.tick === 1) w.events.push({ type: 'roundStart', round: m.round, introSec: m.roundIntroLeft, score: { ...m.score } }); m.roundIntroLeft = Math.max(0, m.roundIntroLeft - DT); if (m.roundIntroLeft === 0) w.events.push({ type: 'roundLive', round: m.round }); ackInputs(); return; } // nedtælling: alle står stille
+    m.timeLeft = Math.max(0, m.timeLeft - DT); if (m.timeLeft === 0) endRound(w, timeoutWinner(w), 'time');
+  } else if (!m.over) { m.timeLeft = Math.max(0, m.timeLeft - DT); if (m.timeLeft === 0) endMatch(w); }
   for (const p of w.players) {
     const c = w.classes[p.cls], wp = c.weapon, inp = inputs[p.id];
     if (!p.alive) { p.respawnLeft -= DT; if (p.respawnLeft <= 0 && !w.match.over) spawn(w, p); continue; }
+    if (w.match.roundEndLeft > 0) { if (inp && inp.seq != null) p.lastSeq = inp.seq; continue; } // runden er afgjort: ingen handlinger
     p.spawnShieldLeft = Math.max(0, p.spawnShieldLeft - DT);
     p.abilityCooldownLeft = Math.max(0, p.abilityCooldownLeft - DT);
     p.fireCooldownLeft = Math.max(0, p.fireCooldownLeft - DT);
@@ -314,7 +363,7 @@ export function step(w, inputs) {
 
 // Snapshot til render, HUD og netværk (samme felter overalt)
 export function snapshot(w) {
-  return { tick: w.tick, match: { score: { ...w.match.score }, timeLeft: w.match.timeLeft, over: w.match.over },
+  return { tick: w.tick, match: { mode: w.match.mode, score: { ...w.match.score }, round: w.match.round, roundIntroLeft: w.match.roundIntroLeft, timeLeft: w.match.timeLeft, over: w.match.over },
     players: w.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, radius: p.radius, x: p.x, y: p.y, aim: p.aim, alive: p.alive, hp: p.hp, maxHp: p.maxHp,
       charges: p.charges, chargeProgress: p.chargeProgress, abilityCooldownLeft: p.abilityCooldownLeft, spawnShieldLeft: p.spawnShieldLeft, invulnLeft: p.invulnLeft, focusLeft: p.focusLeft, respawnLeft: p.respawnLeft, lastSeq: p.lastSeq })),
     projectiles: w.projectiles.map(b => ({ id: b.id, team: b.team, x: b.x, y: b.y })),

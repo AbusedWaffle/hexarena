@@ -123,7 +123,7 @@ export function createClientSession(transport, opts) {
       for (const sp of snap.players) { const p = world.players.find(q => q.id === sp.id); if (p) Object.assign(p, sp); }
       // Reconciliation: start fra hostens position for egen spiller og afspil de inputs, hosten ikke har set endnu
       const me = world.players.find(p => p.id === 'me');
-      if (me) { const ack = snap.players.find(p => p.id === 'me')?.lastSeq ?? 0; pending = pending.filter(f => f.seq > ack); if (me.alive) for (const f of pending) predictMove(world, me, me.cls, f.move); }
+      if (me) { const ack = snap.players.find(p => p.id === 'me')?.lastSeq ?? 0; pending = pending.filter(f => f.seq > ack); if (me.alive && !(snap.match.roundIntroLeft > 0)) for (const f of pending) predictMove(world, me, me.cls, f.move); }
       world.match = { ...world.match, ...snap.match }; world.projectiles = snap.projectiles; world.grenades = snap.grenades; world.zones = snap.zones;
       view = snap;
     }
@@ -133,7 +133,8 @@ export function createClientSession(transport, opts) {
     sendInput(f) { // kaldes hvert lokalt tick (20 Hz) med egen InputFrame
       pending.push(f); if (pending.length > 60) pending.shift();
       const me = world.players.find(p => p.id === 'me');
-      if (me && me.alive) { predictMove(world, me, me.cls, f.move); if (f.aim) me.aim = f.aim; }
+      const frozen = view && view.match.roundIntroLeft > 0; // nedtælling: hosten flytter ingen
+      if (me && me.alive && !frozen) { predictMove(world, me, me.cls, f.move); if (f.aim) me.aim = f.aim; }
       transport.send('host', 'u', { t: 'in', f: pending.slice(-INPUT_REDUNDANCY) });
     },
     view() { // snapshot til render/HUD; egen spiller fra prediction
