@@ -203,7 +203,7 @@ export function createAI(w, cfg, seed = 1) {
       if (partner && (b.diff.aggression ?? 1) >= 2) { b.flank = true; partner.flank = true; partner.flankSide = partner.flankSide ?? 1; b.flankSide = -partner.flankSide; }
       else { b.flank = R() < b.diff.flankChance + (prof(p).flankBonus ?? 0); b.flankSide = null; }
     }
-    if (b.target && b.target.id !== b.huntId && hunters(p.team, b.target.id, b) >= (cfg.maxBotsPerTarget ?? 2) && dist(p, b.target) > 5 * U) b.noChase = true;
+    if (b.target && b.target.id !== b.huntId && hunters(p.team, b.target.id, b) >= (cfg.maxBotsPerTarget ?? 2)) b.noChase = true; // tredje bot skyder fra hvor den står, men følger ikke efter
     // Tilstandsvalg (simpel utility)
     let next = hunt ? 'seek' : 'hold';
     if (hpf < (cfg.retreatHpFrac ?? 0.3) && (b.state === 'retreat' || retreatingCount(p.team) < maxRetreat)) next = 'retreat';
