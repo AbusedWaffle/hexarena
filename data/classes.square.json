@@ -166,7 +166,7 @@
     "coneDeg": 360,
     "preferInAimDirDeg": 60,
     "targetStickySec": 0.6,
-    "leadTarget": 0.8,
+    "leadTarget": 0.5,
     "lowHpBias": 0.3,
     "requireLineOfSight": true
   }
