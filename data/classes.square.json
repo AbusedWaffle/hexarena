@@ -2,7 +2,7 @@
   "_note": "Kvadratisk grid: afstande i tiles (1 tile ≈ ½ tidligere hex), tid i sekunder. Én ladning = én salve. projectileSpeed 0 = hitscan. shape peger på SHAPES i art/palette.js.",
   "Assault": {
     "hp": 100,
-    "speed": 6.0,
+    "speed": 4.5,
     "shape": "assault",
     "weapon": {
       "damage": 10,
@@ -29,7 +29,7 @@
   },
   "Sniper": {
     "hp": 70,
-    "speed": 5.4,
+    "speed": 4.0,
     "shape": "sniper",
     "weapon": {
       "damage": 55,
@@ -55,7 +55,7 @@
   },
   "Engineer": {
     "hp": 140,
-    "speed": 5.2,
+    "speed": 3.9,
     "shape": "engineer",
     "weapon": {
       "damage": 12,
@@ -80,7 +80,7 @@
   },
   "Scout": {
     "hp": 95,
-    "speed": 8.0,
+    "speed": 5.8,
     "shape": "scout",
     "weapon": {
       "damage": 10,
@@ -105,7 +105,7 @@
   },
   "Support": {
     "hp": 90,
-    "speed": 6.0,
+    "speed": 4.5,
     "shape": "support",
     "weapon": {
       "damage": 19,
@@ -130,7 +130,7 @@
     "radius": 0.42
   },
   "_match": {
-    "mode": "tdm",
+    "mode": "knockout",
     "durationSec": 150,
     "killTarget": 15,
     "respawnSec": 3,
@@ -141,7 +141,22 @@
     "crateRespawnSec": 25,
     "crateRespawnBlockRadius": 1,
     "regenPerSec": 8,
-    "regenDelaySec": 3
+    "regenDelaySec": 3,
+    "roundsToWin": 3,
+    "roundTimeSec": 75,
+    "roundIntroSec": 3,
+    "respawnInRound": false,
+    "roundTimeoutWinner": "most_alive_then_hp",
+    "resetOnRound": [
+      "positions",
+      "hp",
+      "charges",
+      "abilityCooldown",
+      "crates",
+      "grenades",
+      "zones"
+    ],
+    "_modes": "knockout = runder uden respawn, først til roundsToWin; tdm = gammel tilstand med respawn (durationSec/killTarget/respawnSec)."
   },
   "_ai": {
     "maxRetreatingPerTeam": 1,
