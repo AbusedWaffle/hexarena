@@ -13,20 +13,34 @@ export function createInputSystem(scene, { getPlayerScreenPos, getAbilityRangePx
   scene.input.addPointer(2);
   scene.input.mouse?.disableContextMenu();
   let seq = 0, move = null, attack = null, abil = null, pendingFire = null, pendingAbility = null, mouse = null;
-  const ptr = (id) => scene.input.manager.pointers.find(p => p.id === id);
+  const ptr = (id) => { const p = scene.input.manager.pointers.find(q => q.id === id); if (!p) return p; const l = p.wasTouch && live.get(p.identifier); return l ? { ...l, id: p.id, wasTouch: true, upTime: p.upTime, identifier: p.identifier } : p; };
+  const lastSeen = new Map(); // sidste kendte position pr. finger, også efter slip
+  const lastPos = (p) => { const l = lastSeen.get(p.identifier); return l ? { x: l.x, y: l.y, upTime: p.upTime, id: p.id } : p; };
   const inBtn = (p) => Math.hypot(p.x - C.abilityBtn.x, p.y - C.abilityBtn.y) <= C.abilityBtn.r * 1.25;
   const drag = (s, p) => { const d = Math.hypot(p.x - s.ox, p.y - s.oy); if (s.max !== undefined && d > s.max) s.max = d; return { x: p.x - s.ox, y: p.y - s.oy, d }; };
 
-  scene.input.on('pointerdown', (p) => {
+  // Hele venstre/højre halvdel af skærmen tæller, også sorte kanter uden for selve spillet (Phaser sender dem som *outside*).
+  const onDown = (p) => {
     if (!p.wasTouch) { mouse = { right: p.rightButtonDown() }; return; }
     if (inBtn(p) && !abil) { abil = { id: p.id, ox: C.abilityBtn.x, oy: C.abilityBtn.y, max: 0, t: p.downTime }; return; }
     if (p.x < 640 && !move) { move = { id: p.id, ox: p.x, oy: p.y }; return; }   // flydende joystick
     if (p.x >= 640 && !attack) attack = { id: p.id, ox: p.x, oy: p.y, max: 0, t: p.downTime };
-  });
+  };
+  scene.input.on('pointerdown', onDown); scene.input.on('pointerdownoutside', onDown);
+  // Phaser opdaterer kun pointere, mens fingeren er over selve canvas. Vi følger derfor alle fingre på hele
+  // skærmen selv, så et joystick startet i en sort kant (eller trukket ud over kanten) stadig virker.
+  const live = new Map(), sm = scene.scale;
+  const pos = (t) => ({ x: sm.transformX(t.pageX), y: sm.transformY(t.pageY) });
+  const track = (e) => { for (const t of e.changedTouches) { const q = pos(t); live.set(t.identifier, q); lastSeen.set(t.identifier, q); } };
+  const untrack = (e) => { for (const t of e.changedTouches) { lastSeen.set(t.identifier, pos(t)); live.delete(t.identifier); } };
+  const opts = { capture: true, passive: true };
+  window.addEventListener('touchstart', track, opts); window.addEventListener('touchmove', track, opts);
+  window.addEventListener('touchend', untrack, opts); window.addEventListener('touchcancel', untrack, opts);
+  scene.events.once('shutdown', () => { for (const [n, f] of [['touchstart', track], ['touchmove', track], ['touchend', untrack], ['touchcancel', untrack]]) window.removeEventListener(n, f, opts); });
   scene.input.on('pointermove', (p) => {
     for (const s of [attack, abil]) if (s && s.id === p.id) s.max = Math.max(s.max, drag(s, p).d);
   });
-  scene.input.on('pointerup', (p) => {
+  const onUp = (p) => {
     if (!p.wasTouch) { // desktop: venstre slip = manuelt skud mod musen, højre slip = sigtet ability
       const s = getPlayerScreenPos(), v = { x: p.x - s.x, y: p.y - s.y };
       if (mouse?.right) pendingAbility = { aim: scaleTo(v, Math.min(1, Math.hypot(v.x, v.y) / Math.max(1, getAbilityRangePx()))) };
@@ -34,9 +48,10 @@ export function createInputSystem(scene, { getPlayerScreenPos, getAbilityRangePx
       mouse = null; return;
     }
     if (move && move.id === p.id) { move = null; return; }
-    if (attack && attack.id === p.id) { pendingFire = release(attack, p); attack = null; return; }
-    if (abil && abil.id === p.id) { const r = release({ ...abil, ox: abil.ox, oy: abil.oy }, p, true); pendingAbility = r; abil = null; }
-  });
+    if (attack && attack.id === p.id) { pendingFire = release(attack, lastPos(p)); attack = null; return; }
+    if (abil && abil.id === p.id) { const r = release({ ...abil, ox: abil.ox, oy: abil.oy }, lastPos(p), true); pendingAbility = r; abil = null; }
+  };
+  scene.input.on('pointerup', onUp); scene.input.on('pointerupoutside', onUp);
   // tap → auto (aim null), træk → manuel, træk tilbage og slip → annullér (null-resultat)
   function release(s, p, isAbility = false) {
     const d = drag(s, p);
