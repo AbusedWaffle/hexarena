@@ -16,6 +16,8 @@ const QS = new URLSearchParams(location.search), AI_DIFF = QS.get('diff') || 'no
 // Multiplayer: ?host=1 opretter et spil (kode vises), ?room=KODE deltager. Ellers singleplayer mod bots.
 const ROOM = (QS.get('room') || '').toUpperCase(), MODE = ROOM ? 'client' : QS.has('host') ? 'host' : 'local';
 const MY_CLS = classes[QS.get('cls')] ? QS.get('cls') : 'Assault';
+// Kamera-tal: synsfelt i tiles, følge-blødhed (andel pr. frame ved 60 fps; 0,15 ≈ 0,1 s forsinkelse) og fremskydning under manuel sigte
+const CAMERA = { tilesW: 14, tilesH: 8, lerp: 0.15, aimLeadTiles: 1.5 };
 const hexStr = (c) => '#' + c.toString(16).padStart(6, '0');
 
 class Arena extends Phaser.Scene {
@@ -46,9 +48,11 @@ class Arena extends Phaser.Scene {
     this.staticG = this.add.graphics(); this.drawMap();
     this.g = this.add.graphics(); this.fxG = this.add.graphics(); this.ghosts = new Map(); this.pops = []; this.abilityFx = new AbilityFx(this);
     this.camTarget = this.add.zone(this.me.x, this.me.y, 1, 1);
-    this.cameras.main.setBounds(...(() => { // er banen smallere/lavere end skærmen, centreres den i stedet for en tom stribe
-      const mw = map.width * TILE_PX, mh = map.height * TILE_PX, ox = Math.min(0, (mw - 1280) / 2), oy = Math.min(0, (mh - 720) / 2);
-      return [ox, oy, Math.max(mw, 1280), Math.max(mh, 720)]; })()).setBackgroundColor(hexStr(PALETTE.bg)).startFollow(this.camTarget, true, 0.15, 0.15);
+    // Kamera som i Brawl Stars: egen spiller altid i midten, ingen banegrænser (uden for banen ses baggrunden),
+    // zoom så man ser ca. CAMERA.tilesW × CAMERA.tilesH tiles, og blød følge.
+    const zoom = Math.min(1280 / (CAMERA.tilesW * TILE_PX), 720 / (CAMERA.tilesH * TILE_PX));
+    this.cameras.main.setZoom(zoom).setBackgroundColor(hexStr(PALETTE.bg)).startFollow(this.camTarget, false, CAMERA.lerp, CAMERA.lerp);
+    this.cameras.main.centerOn(this.me.x, this.me.y);
     this.input_ = createInputSystem(this, {
       getPlayerScreenPos: () => this.hudUI.toScreen(this.me.x, this.me.y),
       getAbilityRangePx: () => ((classes[this.me.cls].ability?.throwRange) || 6) * TILE_PX });
@@ -113,10 +117,10 @@ class Arena extends Phaser.Scene {
     for (const p of this.cur.players) {
       const pp = this.prev.players.find(q => q.id === p.id) || p; if (!p.alive) continue;
       const x = lerp(pp.x, p.x), y = lerp(pp.y, p.y), col = p.team === 'blue' ? PALETTE.blue : PALETTE.red, glow = p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, r = p.radius ?? TILE_PX * 0.4;
-      if (p.id === 'me') { const la = this.input_.aimPreview(), ll = la ? Math.hypot(la.x, la.y) || 1 : 1; this.camTarget.setPosition(x + (la ? la.x / ll * 1.5 * TILE_PX : 0), y + (la ? la.y / ll * 1.5 * TILE_PX : 0)); g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5); }
+      if (p.id === 'me') { const la = this.input_.aimPreview(), ll = la ? Math.hypot(la.x, la.y) || 1 : 1; this.camTarget.setPosition(x + (la ? la.x / ll * CAMERA.aimLeadTiles * TILE_PX : 0), y + (la ? la.y / ll * CAMERA.aimLeadTiles * TILE_PX : 0)); g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5); }
       drawUnit(g, classes[p.cls]?.shape, x, y, r, Math.atan2(p.aim?.y || 0, p.aim?.x || 1), col, glow);
       if (p.spawnShieldLeft > 0) g.lineStyle(2, glow, FX.spawnShield.alpha + 0.3 * Math.sin(now / FX.spawnShield.pulseMs * 6.28)).strokeCircle(x, y, r + 9);
-      g.fillStyle(0x000000, 0.6).fillRect(x - 18, y - r - 14, 36, 4).fillStyle(col).fillRect(x - 18, y - r - 14, 36 * p.hp / p.maxHp, 4);
+      { const z = this.cameras.main.zoom, bw = 36 / z, bh = 4 / z, by = y - r - 10 / z - bh; g.fillStyle(0x000000, 0.6).fillRect(x - bw / 2, by, bw, bh).fillStyle(col).fillRect(x - bw / 2, by, bw * p.hp / p.maxHp, bh); } // HP-bar i fast skærmstørrelse (36×4 px) uanset zoom
       if (p.id === 'me') for (let i = 0; i < classes[p.cls].weapon.charges; i++) { const f = i < p.charges ? 1 : i === p.charges ? p.chargeProgress : 0; g.fillStyle(0x000000, 0.6).fillRect(x - 18 + i * 12.5, y + r + 8, 11, 3).fillStyle(PALETTE.score).fillRect(x - 18 + i * 12.5, y + r + 8, 11 * f, 3); }
     }
     const aim = this.input_.aimPreview();
