@@ -47,6 +47,7 @@ export function createAI(w, cfg, seed = 1) {
       move: { x: 0, y: 0 }, aim: null, seq: 0 });
   }
   const removeBot = (id) => bots.delete(id);
+  function resetBot(b) { Object.assign(b, { state: 'seek', stateSince: w.tick * DT, path: [], pathGoal: null, target: null, mem: null, seenSince: null, coverTile: null, flank: false, radial: 0, move: { x: 0, y: 0 }, lastPos: null, stuckT: 0, prevT: null }); }
 
   function enemiesOf(p) { return w.players.filter(e => e.alive && e.team !== p.team); }
 
@@ -122,7 +123,7 @@ export function createAI(w, cfg, seed = 1) {
       }
     }
     // Strafe-retning skifter tilfældigt
-    if (now > b.strafeUntil) { b.strafe = R() < 0.5 ? -1 : 1; b.strafeUntil = now + 0.6 + R() * 0.8; }
+    if (now > b.strafeUntil) { b.strafe = R() < 0.5 ? -1 : 1; b.strafeUntil = now + (cfg.strafeMinSec ?? 0.8) + R() * ((cfg.strafeMaxSec ?? 1.5) - (cfg.strafeMinSec ?? 0.8)); }
     b.aimErr = (R() * 2 - 1) * b.diff.aimErrorDeg * Math.PI / 180;
     // Fastlåst? (bevæget < 0,3 tile det seneste sekund)
     if (b.lastPos && dist(b.lastPos, p) < 0.3 * U * thinkEvery / 20) { b.stuckT += thinkEvery * DT; } else b.stuckT = 0;
@@ -143,11 +144,13 @@ export function createAI(w, cfg, seed = 1) {
     const t = b.target && b.target.alive ? b.target : null;
     if (b.state === 'engage' && t) {
       const d = dist(p, t), pref = wp.range * U * (prof(p).preferredRangeFrac ?? cfg.preferredRangeFrac ?? 0.6), to = norm({ x: t.x - p.x, y: t.y - p.y });
-      const radial = d > pref * 1.15 ? 1 : d < pref * 0.75 ? -1 : 0;
-      let mv = { x: to.x * radial - to.y * b.strafe * 0.8, y: to.y * radial + to.x * b.strafe * 0.8 };
+      // Hysterese: skift kun frem/tilbage, når afstanden er tydeligt forkert, så botten ikke vipper på grænsen
+      if (d > pref * 1.3) b.radial = 1; else if (d < pref * 0.6) b.radial = -1; else if (b.radial === 1 ? d < pref * 1.0 : b.radial === -1 ? d > pref * 0.85 : false) b.radial = 0;
+      const radial = b.radial ?? 0, sa = cfg.strafeAmount ?? 0.6;
+      let mv = { x: to.x * radial - to.y * b.strafe * sa, y: to.y * radial + to.x * b.strafe * sa };
       // undgå at strafe ind i en væg
       const probe = { x: p.x + norm(mv).x * U, y: p.y + norm(mv).y * U }, pt = w.tiles.get(key(Math.floor(probe.x / U), Math.floor(probe.y / U)));
-      if (!pt || isBlocking(pt)) { b.strafe *= -1; mv = { x: to.x * radial, y: to.y * radial }; }
+      if (!pt || isBlocking(pt)) { b.strafe *= -1; b.strafeUntil = now + (cfg.strafeMinSec ?? 0.8); mv = { x: to.x * radial, y: to.y * radial }; }
       f.move = norm(mv); if (!mv.x && !mv.y) f.move = { x: 0, y: 0 };
       // Sigte: lead på projektiler + sigtefejl
       let ax = t.x, ay = t.y;
@@ -166,10 +169,24 @@ export function createAI(w, cfg, seed = 1) {
         if ((b.state === 'retreat' || b.state === 'approach') && p.charges > 0 && dist(p, b.target) <= wp.range * U * Math.min(0.9, prof(p).fireRangeFrac ?? 0.9) && b.seenSince != null && (now - b.seenSince) * 1000 >= b.diff.reactionMs) f.fire = true;
       } else if (Math.hypot(f.move.x, f.move.y) > 0) f.aim = { ...f.move };
     }
-    if (p.abilityCooldownLeft === 0) useAbility(b, p, f, t);
+    f.move = smoothMove(b, f.move);
+    if (!t && b.state !== 'engage' && Math.hypot(f.move.x, f.move.y) > 0.2 && !b.target) f.aim = norm(f.move);
+    if (p.abilityCooldownLeft === 0) useAbility(b, p, f, t); // efter udglatning, så dash går præcis i den ønskede retning
     b.prevT = t ? { id: t.id, x: t.x, y: t.y } : null;
     b.move = f.move; b.aim = f.aim;
     return f;
+  }
+
+  // Blød bevægelse: drej højst maxTurnDegPerSec og accelerér/brems over et par ticks i stedet for at vende på et tick
+  function smoothMove(b, want) {
+    const prev = b.move || { x: 0, y: 0 }, pl = Math.hypot(prev.x, prev.y), wl = Math.min(1, Math.hypot(want.x, want.y)), k = cfg.moveAccel ?? 0.35;
+    if (wl < 0.05) { const m = { x: prev.x * (1 - k * 1.5), y: prev.y * (1 - k * 1.5) }; return Math.hypot(m.x, m.y) < 0.1 ? { x: 0, y: 0 } : m; }
+    const wa = Math.atan2(want.y, want.x);
+    if (pl < 0.1) return { x: Math.cos(wa) * Math.max(wl * k, 0.3), y: Math.sin(wa) * Math.max(wl * k, 0.3) };
+    const pa = Math.atan2(prev.y, prev.x), maxT = (cfg.maxTurnDegPerSec ?? 540) * Math.PI / 180 * DT;
+    let da = wa - pa; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    const a = pa + Math.max(-maxT, Math.min(maxT, da)), l = pl + (wl - pl) * k * (Math.abs(da) > Math.PI / 2 ? 0.5 : 1);
+    return { x: Math.cos(a) * l, y: Math.sin(a) * l };
   }
 
   // Ability-regler pr. klasse. Sætter f.ability (og evt. aim/move) i samme InputFrame; skyder ikke i samme tick.
@@ -210,7 +227,10 @@ export function createAI(w, cfg, seed = 1) {
 
   // Kaldes én gang pr. tick før step(). Læser seneste tick's events (kasser ændret => ny sti).
   function frames() {
-    for (const e of w.events) if (e.type === 'crateBroken' || e.type === 'crateRespawned') { mapVersion++; break; }
+    for (const e of w.events) {
+      if (e.type === 'crateBroken' || e.type === 'crateRespawned') mapVersion++;
+      if (e.type === 'roundStart') for (const b of bots.values()) resetBot(b); // ny runde: glem mål, stier og strafe
+    }
     const out = {};
     for (const b of bots.values()) {
       const p = w.players.find(q => q.id === b.id); if (!p) continue;

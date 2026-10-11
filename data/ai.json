@@ -50,5 +50,11 @@
       "flankBonus": 0.1
     }
   },
-  "exposureCost": 3
+  "exposureCost": 3,
+  "strafeMinSec": 0.8,
+  "strafeMaxSec": 1.5,
+  "strafeAmount": 0.6,
+  "maxTurnDegPerSec": 360,
+  "moveAccel": 0.35,
+  "_moveNote": "Bevægelse: strafe skifter retning hvert strafeMinSec–strafeMaxSec s. maxTurnDegPerSec begrænser hvor hurtigt botten kan dreje, og moveAccel (0..1 pr. tick) styrer acceleration/opbremsning."
 }
