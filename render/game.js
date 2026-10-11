@@ -7,23 +7,42 @@ import { createWorld, addPlayer, step, snapshot, raycast, DT } from '../sim/worl
 import { createInputSystem } from './inputSystem.js';
 import { createHud } from './hud.js';
 import { createAI } from '../sim/ai.js';
+import { createPeerHost, createPeerClient, createBcHost, createBcClient, makeCode } from '../net/transport.js';
+import { createHostSession, createClientSession } from '../net/session.js';
 
 const [map, classes, aiCfg] = await Promise.all(['data/map_paintyard_sq_01.json', 'data/classes.square.json', 'data/ai.json'].map(u => fetch(u).then(r => r.json())));
 // URL: ?diff=easy|normal|hard  &red=3 (antal røde bots)  &blue=0 (blå holdkammerater)  &aidebug=1
 const QS = new URLSearchParams(location.search), AI_DIFF = QS.get('diff') || 'normal', AI_DEBUG = QS.has('aidebug');
+// Multiplayer: ?host=1 opretter et spil (kode vises), ?room=KODE deltager. Ellers singleplayer mod bots.
+const ROOM = (QS.get('room') || '').toUpperCase(), MODE = ROOM ? 'client' : QS.has('host') ? 'host' : 'local';
+const MY_CLS = classes[QS.get('cls')] ? QS.get('cls') : 'Assault';
 const hexStr = (c) => '#' + c.toString(16).padStart(6, '0');
 
 class Arena extends Phaser.Scene {
   create() {
-    this.world = createWorld(map, classes);
-    this.me = addPlayer(this.world, { team: 'blue', cls: classes[QS.get('cls')] ? QS.get('cls') : 'Assault', id: 'me' });
-    // AI-bots på de øvrige pladser (sim/ai.js). Bots giver samme InputFrame som en spiller.
-    this.ai = createAI(this.world, aiCfg, Date.now() & 0xffff);
-    const order = ['Assault', 'Sniper', 'Scout', 'Engineer', 'Support'];
-    const nRed = Math.min(4, Number(QS.get('red') ?? 3)), nBlue = Math.min(3, Number(QS.get('blue') ?? 0));
-    for (let i = 0; i < nRed; i++) this.ai.addBot(addPlayer(this.world, { team: 'red', cls: order[i % 5], id: 'botR' + i }).id, AI_DIFF);
-    for (let i = 0; i < nBlue; i++) this.ai.addBot(addPlayer(this.world, { team: 'blue', cls: order[(i + 1) % 5], id: 'botB' + i }).id, AI_DIFF);
-    this.prev = this.cur = snapshot(this.world); this.acc = 0;
+    this.ai = null; this.net = null; this.client = null;
+    if (MODE === 'client') {
+      this.client = createClientSession((QS.get('net') === 'bc' ? createBcClient : createPeerClient)(ROOM), { map, classes, cls: MY_CLS,
+        onWelcome: (me) => { this.me = me; }, onFull: () => this.netMsg?.setText('Spillet er fuldt') });
+      this.world = this.client.world;
+      this.me = { x: 0, y: 0, team: 'blue', cls: MY_CLS, alive: false }; // pladsholder, indtil hosten svarer
+    } else {
+      this.world = createWorld(map, classes);
+      this.me = addPlayer(this.world, { team: 'blue', cls: MY_CLS, id: 'me' });
+      // AI-bots på de øvrige pladser. I multiplayer overtager netværksspillere bot-pladser, og en bot tager over, hvis de forlader spillet.
+      this.ai = createAI(this.world, aiCfg, Date.now() & 0xffff);
+      const order = ['Assault', 'Sniper', 'Scout', 'Engineer', 'Support'], maxPer = classes._match.maxPerTeam ?? 4;
+      const nRed = Math.min(maxPer, Number(QS.get('red') ?? (MODE === 'host' ? maxPer : 3))), nBlue = Math.min(maxPer - 1, Number(QS.get('blue') ?? (MODE === 'host' ? maxPer - 1 : 0)));
+      for (let i = 0; i < nRed; i++) this.ai.addBot(addPlayer(this.world, { team: 'red', cls: order[i % 5], id: 'botR' + i }).id, AI_DIFF);
+      for (let i = 0; i < nBlue; i++) this.ai.addBot(addPlayer(this.world, { team: 'blue', cls: order[(i + 1) % 5], id: 'botB' + i }).id, AI_DIFF);
+      if (MODE === 'host') {
+        const code = makeCode(), tr = (QS.get('net') === 'bc' ? createBcHost : createPeerHost)(code);
+        this.net = createHostSession(this.world, tr, { ai: this.ai, aiDifficulty: AI_DIFF, onRoster: (r) => this.netMsg?.setText(this.hostText(code, r)) });
+        tr.onStatus((st, info) => this.netMsg?.setText(st === 'open' ? this.hostText(code, this.net.roster()) : 'Netværksfejl: ' + info));
+        this.code = code;
+      }
+    }
+    this.prev = this.cur = MODE === 'client' ? null : snapshot(this.world); this.acc = 0;
     this.staticG = this.add.graphics(); this.drawMap();
     this.g = this.add.graphics(); this.fxG = this.add.graphics(); this.ghosts = new Map(); this.pops = []; this.abilityFx = new AbilityFx(this);
     this.camTarget = this.add.zone(this.me.x, this.me.y, 1, 1);
@@ -36,7 +55,12 @@ class Arena extends Phaser.Scene {
     this.hudUI = createHud(this, { map, classes, world: this.world, input: this.input_ });
     this.trails = []; this.dmg = new Map(); this.sparks = [];
     this.help = this.add.text(16, 690, 'WASD bevæg · venstreklik hold+slip = skyd · mellemrum = auto-aim · E = ability · højreklik hold+slip = sigtet ability', { fontSize: 12, color: '#5a6385' }).setScrollFactor(0).setDepth(10).setVisible(!this.sys.game.device.input.touch);
+    this.netMsg = MODE === 'local' ? null : this.add.text(640, 60, MODE === 'host' ? 'Opretter spil...' : 'Forbinder til ' + ROOM + '...', { fontFamily: 'Roboto Mono, monospace', fontSize: 16, color: hexStr(PALETTE.text), align: 'center', backgroundColor: '#06091Acc', padding: { x: 10, y: 6 } }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(11);
     this.t = 0; globalThis.__arena = this; // dev-hook til UI-test
+  }
+  hostText(code, roster) {
+    const humans = roster.filter(r => r.human).length, url = location.origin + location.pathname + '?room=' + code;
+    return 'Spilkode: ' + code + '   ·   ' + humans + ' spiller' + (humans === 1 ? '' : 'e') + ' (resten er bots)' + String.fromCharCode(10) + url;
   }
   drawMap() {
     // banen fra Artists drawSquareMap, med aktuel kasse-tilstand (ødelagte kasser tegnes ikke)
@@ -48,9 +72,18 @@ class Arena extends Phaser.Scene {
     let redraw = false;
     while (this.acc >= DT) {
       this.acc -= DT;
-      const inputs = { ...this.ai.frames(), me: this.input_.frame() };
-      step(this.world, inputs);
-      this.prev = this.cur; this.cur = snapshot(this.world);
+      if (this.client) {
+        if (!this.client.you) continue;
+        this.client.sendInput(this.input_.frame());
+        const v = this.client.view(); if (!v) continue;
+        if (!this.cur) { this.cur = v; this.netMsg.setVisible(false); redraw = true; }
+        this.prev = this.cur; this.cur = v;
+      } else {
+        const inputs = { ...this.ai.frames(), ...(this.net ? this.net.frames() : {}), me: this.input_.frame() };
+        step(this.world, inputs);
+        this.prev = this.cur; this.cur = snapshot(this.world);
+        this.net?.publish(this.cur);
+      }
       for (const e of this.cur.events) {
         this.abilityFx.onEvent(e, this.cur);
         if (e.type === 'crateDeployed') redraw = true;
@@ -71,6 +104,7 @@ class Arena extends Phaser.Scene {
       }
     }
     if (redraw) { this.staticG.clear(); this.drawMap(); }
+    if (!this.cur) return; // klient: venter på første snapshot
     this.draw(this.acc / DT);
   }
   draw(alpha) {
@@ -86,7 +120,7 @@ class Arena extends Phaser.Scene {
       if (p.id === 'me') for (let i = 0; i < classes[p.cls].weapon.charges; i++) { const f = i < p.charges ? 1 : i === p.charges ? p.chargeProgress : 0; g.fillStyle(0x000000, 0.6).fillRect(x - 18 + i * 12.5, y + r + 8, 11, 3).fillStyle(PALETTE.score).fillRect(x - 18 + i * 12.5, y + r + 8, 11 * f, 3); }
     }
     const aim = this.input_.aimPreview();
-    if (aim && this.me.alive) { const r = raycast(this.world, this.me, aim, classes[this.me.cls].weapon.range * TILE_PX, { ignoreId: 'me', ignoreTeam: 'blue' }); g.lineStyle(3, PALETTE.blueGlow, 0.35).lineBetween(this.me.x, this.me.y, r.point.x, r.point.y); }
+    if (aim && this.me.alive) { const r = raycast(this.world, this.me, aim, classes[this.me.cls].weapon.range * TILE_PX, { ignoreId: 'me', ignoreTeam: this.me.team }); g.lineStyle(3, PALETTE.blueGlow, 0.35).lineBetween(this.me.x, this.me.y, r.point.x, r.point.y); }
     const ab = this.input_.abilityPreview(), abd = classes[this.me.cls].ability;
     if (ab && this.me.alive && abd && ['grenade', 'dash', 'deploy_crate'].includes(abd.id)) {
       const rng = (abd.throwRange || abd.distance || (abd.placeRange + 0.5) || 3) * TILE_PX, l = Math.hypot(ab.x, ab.y) || 1, len = abd.id === 'grenade' ? Math.max(0.05, l) * rng : rng;
@@ -104,7 +138,7 @@ class Arena extends Phaser.Scene {
     this.sparks = this.sparks.filter(s => now - s.born < FX.hitSpark.ms);
     for (const s of this.sparks) { const k = (now - s.born) / 1000; this.fxG.fillStyle(s.c, 1 - (now - s.born) / FX.hitSpark.ms).fillCircle(s.x + s.vx * k, s.y + s.vy * k, FX.hitSpark.size); }
     this.drawDamageNumbers(now);
-    if (AI_DEBUG) this.drawAIDebug();
+    if (AI_DEBUG && this.ai) this.drawAIDebug();
     this.hudUI.draw(this.cur);
   }
   drawAIDebug() { // sti, mål og tilstand pr. bot (?aidebug=1)

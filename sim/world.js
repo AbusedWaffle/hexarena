@@ -22,6 +22,13 @@ export function addPlayer(w, { team, cls, id }) {
   w.players.push(p); spawn(w, p); return p;
 }
 
+// Skift klasse (fx når en netværksspiller overtager en bot-plads). Respawner spilleren med den nye klasses værdier.
+export function setClass(w, p, cls) {
+  const c = w.classes[cls]; if (!c) return;
+  Object.assign(p, { cls, radius: (c.radius ?? PLAYER_RADIUS) * U, maxHp: c.hp, salvo: null, focusLeft: 0, invulnLeft: 0, abilityCooldownLeft: 0 });
+  spawn(w, p);
+}
+
 function spawn(w, p) {
   // Ledig spawn længst fra synlige fjender (fjender uden synslinje tæller svagere)
   const list = w.map.spawns[p.team]; let s = list[0], best = -Infinity;
@@ -109,6 +116,17 @@ function resolveCollision(w, p) {
   }
 }
 
+// Del bevægelsen op, så intet skridt er længere end ½ radius (ingen hjørneskæring ved høj fart)
+function moveBy(w, p, dx, dy) {
+  const sub = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (p.radius * 0.5)));
+  for (let i = 0; i < sub; i++) { p.x += dx / sub; p.y += dy / sub; resolveCollision(w, p); }
+}
+// Client-side prediction: samme bevægelse som step() for ét InputFrame (bruges på klienten til egen spiller)
+export function predictMove(w, p, cls, move) {
+  const m = move || { x: 0, y: 0 }, ml = Math.min(1, Math.hypot(m.x, m.y)), mn = Math.hypot(m.x, m.y) || 1;
+  const v = w.classes[cls].speed * U * DT * ml; moveBy(w, p, m.x / mn * v, m.y / mn * v);
+}
+
 function autoAimTarget(w, p, rangePx) {
   let best = null;
   for (const e of w.players) {
@@ -156,7 +174,7 @@ function damagePlayer(w, ownerId, t, damage, extra = {}) {
     t.alive = false; t.deaths++; t.respawnLeft = w.classes._match.respawnSec;
     const k = w.players.find(q => q.id === ownerId); if (k && k.team !== t.team) k.kills++;
     w.match.score[k && k.team !== t.team ? k.team : (t.team === 'blue' ? 'red' : 'blue')]++;
-    w.events.push({ type: 'kill', id: t.id, by: ownerId, x: t.x, y: t.y });
+    w.events.push({ type: 'kill', id: t.id, by: ownerId, x: t.x, y: t.y, score: { ...w.match.score } });
     if (w.match.score.blue >= w.classes._match.killTarget || w.match.score.red >= w.classes._match.killTarget) endMatch(w);
   }
 }
@@ -233,7 +251,7 @@ function stepAbilities(w) {
   w.zones = w.zones.filter(z => z.left > 0);
 }
 
-function endMatch(w) { if (!w.match.over) { w.match.over = true; const s = w.match.score; w.events.push({ type: 'matchOver', winner: s.blue === s.red ? 'draw' : s.blue > s.red ? 'blue' : 'red' }); } }
+function endMatch(w) { if (!w.match.over) { w.match.over = true; const s = w.match.score; w.events.push({ type: 'matchOver', winner: s.blue === s.red ? 'draw' : s.blue > s.red ? 'blue' : 'red', score: { ...s } }); } }
 
 // inputs: { [playerId]: InputFrame }  InputFrame = { move:{x,y}, aim:{x,y}|null, fire, ability, seq }
 export function step(w, inputs) {
@@ -253,9 +271,7 @@ export function step(w, inputs) {
     p.lastSeq = inp.seq ?? p.lastSeq;
     const m = inp.move || { x: 0, y: 0 }, ml = Math.min(1, Math.hypot(m.x, m.y)), mn = Math.hypot(m.x, m.y) || 1;
     const v = c.speed * U * DT * ml;
-    // Del bevægelsen op, så intet skridt er længere end ½ radius (ingen hjørneskæring ved høj fart)
-    const sub = Math.max(1, Math.ceil(v / (p.radius * 0.5)));
-    for (let i = 0; i < sub; i++) { p.x += m.x / mn * v / sub; p.y += m.y / mn * v / sub; resolveCollision(w, p); }
+    moveBy(w, p, m.x / mn * v, m.y / mn * v);
     if (inp.aim && Math.hypot(inp.aim.x, inp.aim.y) > 0.01) p.aim = { x: inp.aim.x, y: inp.aim.y };
     if (inp.fire && !p.salvo && p.charges > 0 && p.fireCooldownLeft === 0) {
       let dir = inp.aim, auto = false;

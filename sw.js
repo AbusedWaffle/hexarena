@@ -3,7 +3,7 @@
 const VERSION = 'hexarena-v1';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'vendor/phaser.min.js',
   'render/game.js', 'render/hud.js', 'render/inputSystem.js',
-  'sim/world.js', 'sim/grid.js', 'sim/ai.js',
+  'sim/world.js', 'sim/grid.js', 'sim/ai.js', 'net/transport.js', 'net/codec.js', 'net/session.js', 'vendor/peerjs.min.js',
   'art/palette.js', 'art/shapes.js', 'art/squareMap.js', 'art/abilityFx.js',
   'data/map_paintyard_sq_01.json', 'data/classes.square.json', 'data/ai.json',
   'icons/icon-192.png', 'icons/icon-512.png'];
