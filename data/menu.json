@@ -1,0 +1,119 @@
+{
+  "_note": "Tekster og visning til menuen. Stats er 1–5 til søjler i klassevalget; de rigtige tal ligger i classes.square.json.",
+  "classes": [
+    {
+      "id": "Assault",
+      "name": "Assault",
+      "role": "Allround",
+      "desc": "Riffel med salver på mellemlang afstand. God til begyndere.",
+      "weapon": "Riffel – 3 salver à 4 skud",
+      "ability": {
+        "name": "Granat",
+        "desc": "Kastes over cover og rammer alle i et lille område."
+      },
+      "stats": {
+        "liv": 3,
+        "fart": 3,
+        "skade": 3,
+        "rækkevidde": 4
+      }
+    },
+    {
+      "id": "Sniper",
+      "name": "Sniper",
+      "role": "Lang afstand",
+      "desc": "Få, hårde skud på lang afstand. Hold dig bagved og pas på nærkamp.",
+      "weapon": "Snigskytteriffel – 2 skud",
+      "ability": {
+        "name": "Fokus",
+        "desc": "Næste skud giver 50 % mere skade og går igennem fjender."
+      },
+      "stats": {
+        "liv": 2,
+        "fart": 2,
+        "skade": 5,
+        "rækkevidde": 5
+      }
+    },
+    {
+      "id": "Engineer",
+      "name": "Engineer",
+      "role": "Tank",
+      "desc": "Holder til meget og er livsfarlig tæt på. Byg dit eget cover.",
+      "weapon": "Haglgevær – 5 hagl pr. skud",
+      "ability": {
+        "name": "Byg kasse",
+        "desc": "Sætter en kasse foran dig som cover."
+      },
+      "stats": {
+        "liv": 5,
+        "fart": 1,
+        "skade": 4,
+        "rækkevidde": 2
+      }
+    },
+    {
+      "id": "Scout",
+      "name": "Scout",
+      "role": "Nærkamp og flanke",
+      "desc": "Hurtig og svær at ramme. Snig dig ind fra siden.",
+      "weapon": "SMG – hurtige salver",
+      "ability": {
+        "name": "Dash",
+        "desc": "Spring frem og vær usårlig et kort øjeblik."
+      },
+      "stats": {
+        "liv": 3,
+        "fart": 5,
+        "skade": 3,
+        "rækkevidde": 2
+      }
+    },
+    {
+      "id": "Support",
+      "name": "Support",
+      "role": "Hjælper",
+      "desc": "Hold holdet i live og skyd præcist på mellemlang afstand.",
+      "weapon": "Pistol – dobbeltskud",
+      "ability": {
+        "name": "Heal-zone",
+        "desc": "Healer alle holdkammerater i zonen i 4 sekunder."
+      },
+      "stats": {
+        "liv": 3,
+        "fart": 3,
+        "skade": 2,
+        "rækkevidde": 4
+      }
+    }
+  ],
+  "difficulties": [
+    {
+      "id": "easy",
+      "name": "Let",
+      "desc": "Robotterne reagerer langsomt, sigter upræcist og bliver ved deres post."
+    },
+    {
+      "id": "normal",
+      "name": "Normal",
+      "desc": "Robotterne bruger cover og angriber, når de har overtal."
+    },
+    {
+      "id": "hard",
+      "name": "Svær",
+      "desc": "Robotterne sigter skarpt og angriber sammen fra flere sider."
+    }
+  ],
+  "defaults": {
+    "cls": "Assault",
+    "difficulty": "normal",
+    "teamSize": 4,
+    "mode": "knockout"
+  },
+  "teamSizes": [
+    1,
+    2,
+    3,
+    4
+  ]
+}
