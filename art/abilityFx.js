@@ -6,7 +6,7 @@ const teamGlow = t => t === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow;
 const teamCol = t => t === 'blue' ? PALETTE.blue : PALETTE.red;
 
 export class AbilityFx {
-  constructor(scene) { this.s = scene; this.booms = []; this.debris = []; this.dashes = []; this.healPlus = []; }
+  constructor(scene) { this.s = scene; this.booms = []; this.debris = []; this.dashes = []; this.healPlus = []; this.deaths = []; }
 
   onEvent(e, cur) {
     const now = this.s.time.now, owner = cur.players.find(p => p.id === e.id);
@@ -18,6 +18,11 @@ export class AbilityFx {
       if (me && Math.hypot(me.x - e.x, me.y - e.y) < e.radius * 2.5) this.s.cameras.main.shake(A.explosion.shakeMs, A.explosion.shake / 1000);
     }
     if (e.type === 'dash' && owner) this.dashes.push({ ...e, team: owner.team, cls: owner.cls, r: owner.radius, born: now });
+    if (e.type === 'kill') {
+      const v = cur.players.find(p => p.id === e.id), D = FX.death, team = v?.team ?? 'red', r = v?.radius ?? 18;
+      const shards = Array.from({ length: D.shards }, () => { const a = Math.random() * 6.28, sp = D.shardSpeed * (0.4 + Math.random() * 0.6); return { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, rot: Math.random() * 6.28, spin: (Math.random() - 0.5) * 12, size: r * (0.25 + Math.random() * 0.25) }; });
+      this.deaths.push({ x: e.x, y: e.y, team, r, shards, born: now });
+    }
     if (e.type === 'crateDeployed') this.s.pops?.push({ x: e.x, y: e.y, born: now });
   }
 
@@ -55,6 +60,18 @@ export class AbilityFx {
     }
     this.debris = this.debris.filter(d => now - d.born < A.explosion.debrisMs);
     for (const d of this.debris) { const t = (now - d.born) / 1000, k = (now - d.born) / A.explosion.debrisMs; g.fillStyle(d.c, 1 - k).fillCircle(d.x + d.vx * t * (1 - k * 0.5), d.y + d.vy * t * (1 - k * 0.5), 3 * (1 - k) + 1); }
+
+    // Knockout: formen splintres i holdfarve, ring og et svagt kryds på stedet
+    this.deaths = this.deaths.filter(d => now - d.born < FX.death.markMs);
+    for (const d of this.deaths) {
+      const el = now - d.born, D = FX.death, c = teamCol(d.team), gl = teamGlow(d.team);
+      if (el < D.ringMs) { const k = el / D.ringMs; g.fillStyle(0xffffff, 0.6 * (1 - k)).fillCircle(d.x, d.y, d.r * (1 - k * 0.5)); g.lineStyle(3 * (1 - k) + 1, gl, 1 - k).strokeCircle(d.x, d.y, d.r * (1 + 2 * k)); }
+      if (el < D.ms) { const k = el / D.ms, t = el / 1000 * (1 - k * 0.5);
+        for (const s of d.shards) { const x = d.x + s.vx * t, y = d.y + s.vy * t, a = s.rot + s.spin * t, z = s.size * (1 - k * 0.6);
+          g.fillStyle(c, 1 - k).fillTriangle(x + Math.cos(a) * z, y + Math.sin(a) * z, x + Math.cos(a + 2.4) * z, y + Math.sin(a + 2.4) * z, x + Math.cos(a + 3.9) * z, y + Math.sin(a + 3.9) * z); } }
+      const m = Math.min(1, (D.markMs - el) / 400) * 0.35, s = d.r * 0.6;
+      g.lineStyle(3, c, m).lineBetween(d.x - s, d.y - s, d.x + s, d.y + s).lineBetween(d.x + s, d.y - s, d.x - s, d.y + s);
+    }
 
     // Dash: efterbilleder langs ruten
     this.dashes = this.dashes.filter(d => now - d.born < A.dash.ms);

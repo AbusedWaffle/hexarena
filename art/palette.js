@@ -26,6 +26,8 @@ export const FX = {
   spawnShield: { pulseMs: 400, alpha: 0.35 },
   scorePop:    { scale: 1.4, ms: 200 },
 
+  death: { ms: 650, shards: 9, shardSpeed: 220, ringMs: 350, markMs: 1200 }, // knockout-effekt
+
   abilities: {
     heal:      { fadeSec: 0.5, ringSpin: 0.8, dashes: 12, plusRate: 0.25, plusMs: 700 },
     grenade:   { flightShare: 1.6, arcPx: 40 },   // flyver i de første ~60 % af lunten, blinker de sidste 30 %
