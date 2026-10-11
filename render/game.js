@@ -50,11 +50,11 @@ class Arena extends Phaser.Scene {
       const mw = map.width * TILE_PX, mh = map.height * TILE_PX, ox = Math.min(0, (mw - 1280) / 2), oy = Math.min(0, (mh - 720) / 2);
       return [ox, oy, Math.max(mw, 1280), Math.max(mh, 720)]; })()).setBackgroundColor(hexStr(PALETTE.bg)).startFollow(this.camTarget, true, 0.15, 0.15);
     this.input_ = createInputSystem(this, {
-      getPlayerScreenPos: () => { const c = this.cameras.main; return { x: this.me.x - c.worldView.x, y: this.me.y - c.worldView.y }; },
+      getPlayerScreenPos: () => this.hudUI.toScreen(this.me.x, this.me.y),
       getAbilityRangePx: () => ((classes[this.me.cls].ability?.throwRange) || 6) * TILE_PX });
     this.hudUI = createHud(this, { map, classes, world: this.world, input: this.input_ });
     this.trails = []; this.dmg = new Map(); this.sparks = [];
-    this.help = this.add.text(16, 690, 'WASD bevæg · venstreklik hold+slip = skyd · mellemrum = auto-aim · E = ability · højreklik hold+slip = sigtet ability', { fontSize: 12, color: '#5a6385' }).setScrollFactor(0).setDepth(10).setVisible(!this.sys.game.device.input.touch);
+    this.help = this.hudUI.add(this.add.text(16, 690, 'WASD bevæg · venstreklik hold+slip = skyd · mellemrum = auto-aim · E = ability · højreklik hold+slip = sigtet ability', { fontSize: 12, color: '#5a6385' }).setScrollFactor(0).setDepth(10).setVisible(!this.sys.game.device.input.touch));
     this.netMsg = MODE === 'local' ? null : this.add.text(640, 60, MODE === 'host' ? 'Opretter spil...' : 'Forbinder til ' + ROOM + '...', { fontFamily: 'Roboto Mono, monospace', fontSize: 16, color: hexStr(PALETTE.text), align: 'center', backgroundColor: '#06091Acc', padding: { x: 10, y: 6 } }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(11);
     this.t = 0; globalThis.__arena = this; // dev-hook til UI-test
   }

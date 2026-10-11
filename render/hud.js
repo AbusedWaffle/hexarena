@@ -8,14 +8,19 @@ const hexStr = (c) => '#' + c.toString(16).padStart(6, '0');
 export const HUD = { mini: { tile: 5, margin: 16 }, arrow: { inset: 26, size: 11 } };
 
 export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
-  const g = scene.add.graphics().setScrollFactor(0).setDepth(20);
+  const g = scene.add.graphics().setDepth(20);
   const font = 'Roboto Mono, monospace';
-  const scoreB = scene.add.text(560, 14, '', { fontFamily: font, fontSize: 34, color: hexStr(PALETTE.blue), fontStyle: 'bold' }).setOrigin(1, 0).setScrollFactor(0).setDepth(21);
-  const scoreR = scene.add.text(720, 14, '', { fontFamily: font, fontSize: 34, color: hexStr(PALETTE.red), fontStyle: 'bold' }).setOrigin(0, 0).setScrollFactor(0).setDepth(21);
-  const clock = scene.add.text(640, 18, '', { fontFamily: font, fontSize: 26, color: hexStr(PALETTE.score) }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(21);
-  const center = scene.add.text(640, 300, '', { fontFamily: font, fontSize: 40, color: hexStr(PALETTE.text), align: 'center', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setScrollFactor(0).setDepth(21);
-  const abilTxt = scene.add.text(INPUT.abilityBtn.x, INPUT.abilityBtn.y, '', { fontFamily: font, fontSize: 22, color: hexStr(PALETTE.text) }).setOrigin(0.5).setScrollFactor(0).setDepth(21);
+  const scoreB = scene.add.text(560, 14, '', { fontFamily: font, fontSize: 34, color: hexStr(PALETTE.blue), fontStyle: 'bold' }).setOrigin(1, 0).setDepth(21);
+  const scoreR = scene.add.text(720, 14, '', { fontFamily: font, fontSize: 34, color: hexStr(PALETTE.red), fontStyle: 'bold' }).setOrigin(0, 0).setDepth(21);
+  const clock = scene.add.text(640, 18, '', { fontFamily: font, fontSize: 26, color: hexStr(PALETTE.score) }).setOrigin(0.5, 0).setDepth(21);
+  const center = scene.add.text(640, 300, '', { fontFamily: font, fontSize: 40, color: hexStr(PALETTE.text), align: 'center', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(21);
+  const abilTxt = scene.add.text(INPUT.abilityBtn.x, INPUT.abilityBtn.y, '', { fontFamily: font, fontSize: 22, color: hexStr(PALETTE.text) }).setOrigin(0.5).setDepth(21);
   for (const t of [scoreB, scoreR, clock]) t.setShadow(0, 0, '#000', 6, false, true);
+  // Alt HUD ligger i én container, der modvirker kameraets zoom, så HUD'en altid er i skærmkoordinater (1280×720)
+  // uanset hvor meget kameraet zoomer. Skærm s vises når container-position = c - c/z og skala = 1/z (c = skærmens midte).
+  const layer = scene.add.container(0, 0, [g, scoreB, scoreR, clock, center, abilTxt]).setScrollFactor(0).setDepth(20);
+  const fitLayer = () => { const z = scene.cameras.main.zoom; layer.setScale(1 / z).setPosition(640 - 640 / z, 360 - 360 / z); };
+  const toScreen = (wx, wy) => { const c = scene.cameras.main, v = c.worldView; return { x: (wx - v.x) * c.zoom, y: (wy - v.y) * c.zoom }; };
   const M = HUD.mini, mw = map.width * M.tile, mh = map.height * M.tile, mx0 = 1280 - M.margin - mw, my0 = M.margin;
   const isTouch = scene.sys.game.device.input.touch;
   let lastRoundMsg = null;
@@ -28,8 +33,11 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
       lastRoundMsg = e.winner === 'draw' ? { text: 'UAFGJORT RUNDE', color: hexStr(PALETTE.text), t: scene.time.now }
         : { text: mine ? 'RUNDE VUNDET' : 'RUNDE TABT', color: hexStr(mine ? PALETTE.blueGlow : PALETTE.redGlow), t: scene.time.now };
     },
+    // læg et ekstra objekt (fx hjælpetekst) i HUD-laget
+    add(obj) { layer.add(obj); return obj; },
+    toScreen,
     draw(snap) {
-      g.clear();
+      fitLayer(); g.clear();
       const me = snap.players.find(p => p.id === meId), m = snap.match, cam = scene.cameras.main, v = cam.worldView;
       // score og ur
       const mm = Math.floor(m.timeLeft / 60), ss = String(Math.floor(m.timeLeft % 60)).padStart(2, '0');
@@ -67,7 +75,7 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
       if (me.alive) for (const p of snap.players) {
         if (!p.alive || p.id === meId || v.contains(p.x, p.y)) continue;
         const ally = p.team === me.team; if (!ally && !hasLineOfSight(world, me, p)) continue;
-        const sx = p.x - v.x, sy = p.y - v.y, cx = 640, cy = 360, dx = sx - cx, dy = sy - cy;
+        const { x: sx, y: sy } = toScreen(p.x, p.y), cx = 640, cy = 360, dx = sx - cx, dy = sy - cy;
         const k = Math.min((640 - HUD.arrow.inset) / Math.abs(dx || 1e-6), (360 - HUD.arrow.inset) / Math.abs(dy || 1e-6));
         const ax = cx + dx * k, ay = cy + dy * k, a = Math.atan2(dy, dx), s = HUD.arrow.size;
         g.fillStyle(p.team === 'blue' ? PALETTE.blue : PALETTE.red, ally ? 0.45 : 0.95)
@@ -77,7 +85,7 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
       // auto-aim-mål: den fjende et tap vil ramme (me.autoTargetId fra sim), som en pulserende ring under figuren
       const tgt = me.alive && me.autoTargetId && snap.players.find(p => p.id === me.autoTargetId && p.alive);
       if (tgt) {
-        const zx = (tgt.x - v.x) * cam.zoom, zy = (tgt.y - v.y) * cam.zoom, rr = (tgt.radius || 20) + 8 + 2 * Math.sin(scene.time.now / 120);
+        const { x: zx, y: zy } = toScreen(tgt.x, tgt.y), rr = (tgt.radius || 20) * cam.zoom + 8 + 2 * Math.sin(scene.time.now / 120);
         g.lineStyle(2, PALETTE.score, 0.85).strokeCircle(zx, zy, rr);
         for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; g.lineBetween(zx + Math.cos(a) * (rr + 2), zy + Math.sin(a) * (rr + 2), zx + Math.cos(a) * (rr + 8), zy + Math.sin(a) * (rr + 8)); }
       }
