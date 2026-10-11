@@ -74,6 +74,14 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
           .fillTriangle(ax + Math.cos(a) * s, ay + Math.sin(a) * s, ax + Math.cos(a + 2.4) * s, ay + Math.sin(a + 2.4) * s, ax + Math.cos(a - 2.4) * s, ay + Math.sin(a - 2.4) * s);
       }
 
+      // auto-aim-mål: den fjende et tap vil ramme (me.autoTargetId fra sim), som en pulserende ring under figuren
+      const tgt = me.alive && me.autoTargetId && snap.players.find(p => p.id === me.autoTargetId && p.alive);
+      if (tgt) {
+        const zx = (tgt.x - v.x) * cam.zoom, zy = (tgt.y - v.y) * cam.zoom, rr = (tgt.radius || 20) + 8 + 2 * Math.sin(scene.time.now / 120);
+        g.lineStyle(2, PALETTE.score, 0.85).strokeCircle(zx, zy, rr);
+        for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; g.lineBetween(zx + Math.cos(a) * (rr + 2), zy + Math.sin(a) * (rr + 2), zx + Math.cos(a) * (rr + 8), zy + Math.sin(a) * (rr + 8)); }
+      }
+
       // joysticks (kun mens de bruges) og ability-knap
       const st = input.state(), R = INPUT.stickRadius;
       if (st.move) { g.lineStyle(3, PALETTE.text, 0.25).strokeCircle(st.move.ox, st.move.oy, R).fillStyle(PALETTE.text, 0.35).fillCircle(st.move.kx, st.move.ky, 26); }
