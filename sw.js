@@ -6,7 +6,9 @@ const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'vendor/phaser.min.js
   'sim/world.js', 'sim/grid.js', 'sim/ai.js', 'net/transport.js', 'net/codec.js', 'net/session.js', 'vendor/peerjs.min.js',
   'art/palette.js', 'art/shapes.js', 'art/squareMap.js', 'art/abilityFx.js',
   'data/map_paintyard_sq_01.json', 'data/classes.square.json', 'data/ai.json',
-  'icons/icon-192.png', 'icons/icon-512.png'];
+  'icons/icon-192.png', 'icons/icon-512.png',
+  'ui/menu.js', 'ui/menu.css', 'art/menu.css', 'data/menu.json',
+  ...['assault', 'sniper', 'engineer', 'scout', 'support'].map((c) => 'art/icons/' + c + '_blue.svg')];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
