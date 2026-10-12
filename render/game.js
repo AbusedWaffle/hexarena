@@ -14,6 +14,7 @@ const [map, classes, aiCfg] = await Promise.all(['data/map_paintyard_sq_01.json'
 // URL: ?diff=easy|normal|hard  &red=3 (antal røde bots)  &blue=0 (blå holdkammerater)  &aidebug=1
 const QS = new URLSearchParams(location.search), AI_DIFF = QS.get('diff') || 'normal', AI_DEBUG = QS.has('aidebug');
 // Multiplayer: ?host=1 opretter et spil (kode vises), ?room=KODE deltager. Ellers singleplayer mod bots.
+addEventListener('hexarena:lobby-start', () => { globalThis.__lobbyStarted = true; });
 const ROOM = (QS.get('room') || '').toUpperCase(), MODE = ROOM ? 'client' : QS.has('host') ? 'host' : 'local';
 const MY_CLS = classes[QS.get('cls')] ? QS.get('cls') : 'Assault';
 // Kamera-tal: synsfelt i tiles, følge-blødhed (andel pr. frame ved 60 fps; 0,15 ≈ 0,1 s forsinkelse) og fremskydning under manuel sigte
@@ -86,6 +87,12 @@ class Arena extends Phaser.Scene {
         if (!this.cur) { this.cur = v; this.netMsg.setVisible(false); redraw = true; }
         this.prev = this.cur; this.cur = v;
       } else {
+        // Host: kampen står stille i lobbyen, indtil 'Start kampen' (hexarena:lobby-start / __lobbyStarted). Lokalt spil starter med det samme.
+        if (MODE === 'host' && !globalThis.__lobbyStarted) {
+          this.net?.frames(); this.input_.frame(); // tøm input, så intet hober sig op
+          const s = snapshot(this.world); s.events = []; s.match.roundIntroLeft = Math.max(s.match.roundIntroLeft || 0, 0.1); // >0: klienter forudsiger ikke bevægelse
+          this.prev = this.cur = s; this.net?.publish(s); continue;
+        }
         const inputs = { ...this.ai.frames(), ...(this.net ? this.net.frames() : {}), me: this.input_.frame() };
         step(this.world, inputs);
         this.prev = this.cur; this.cur = snapshot(this.world);
