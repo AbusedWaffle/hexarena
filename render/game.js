@@ -39,8 +39,11 @@ class Arena extends Phaser.Scene {
       for (let i = 0; i < nBlue; i++) this.ai.addBot(addPlayer(this.world, { team: 'blue', cls: order[(i + 1) % 5], id: 'botB' + i }).id, AI_DIFF);
       if (MODE === 'host') {
         const code = makeCode(), tr = (QS.get('net') === 'bc' ? createBcHost : createPeerHost)(code);
-        this.net = createHostSession(this.world, tr, { ai: this.ai, aiDifficulty: AI_DIFF, onRoster: (r) => this.netMsg?.setText(this.hostText(code, r)) });
-        tr.onStatus((st, info) => this.netMsg?.setText(st === 'open' ? this.hostText(code, this.net.roster()) : 'Netværksfejl: ' + info));
+        // Lobby-overlay (ui/lobby.js) lytter på 'hexarena:lobby' og viser kode, QR, holdliste og status.
+        const lobby = (d) => globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { code, ...d } }));
+        this.net = createHostSession(this.world, tr, { ai: this.ai, aiDifficulty: AI_DIFF, onRoster: (r) => lobby({ roster: r }) });
+        tr.onStatus((st, info) => lobby(st === 'open' ? { status: 'open', roster: this.net.roster() } : { status: 'error', error: String(info) }));
+        lobby({ status: 'connecting' });
         this.code = code;
       }
     }
@@ -59,7 +62,7 @@ class Arena extends Phaser.Scene {
     this.hudUI = createHud(this, { map, classes, world: this.world, input: this.input_ });
     this.trails = []; this.dmg = new Map(); this.sparks = [];
     this.help = this.hudUI.add(this.add.text(16, 690, 'WASD bevæg · venstreklik hold+slip = skyd · mellemrum = auto-aim · E = ability · højreklik hold+slip = sigtet ability', { fontSize: 12, color: '#5a6385' }).setScrollFactor(0).setDepth(10).setVisible(!this.sys.game.device.input.touch));
-    this.netMsg = MODE === 'local' ? null : this.add.text(640, 60, MODE === 'host' ? 'Opretter spil...' : 'Forbinder til ' + ROOM + '...', { fontFamily: 'Roboto Mono, monospace', fontSize: 16, color: hexStr(PALETTE.text), align: 'center', backgroundColor: '#06091Acc', padding: { x: 10, y: 6 } }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(11);
+    this.netMsg = MODE !== 'client' ? null : this.add.text(640, 60, 'Forbinder til ' + ROOM + '...', { fontFamily: 'Roboto Mono, monospace', fontSize: 16, color: hexStr(PALETTE.text), align: 'center', backgroundColor: '#06091Acc', padding: { x: 10, y: 6 } }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(11);
     this.t = 0; globalThis.__arena = this; // dev-hook til UI-test
   }
   hostText(code, roster) {
@@ -118,7 +121,7 @@ class Arena extends Phaser.Scene {
       const pp = this.prev.players.find(q => q.id === p.id) || p; if (!p.alive) continue;
       const x = lerp(pp.x, p.x), y = lerp(pp.y, p.y), col = p.team === 'blue' ? PALETTE.blue : PALETTE.red, glow = p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, r = p.radius ?? TILE_PX * 0.4;
       if (p.id === 'me') { const la = this.input_.aimPreview(), ll = la ? Math.hypot(la.x, la.y) || 1 : 1; this.camTarget.setPosition(x + (la ? la.x / ll * CAMERA.aimLeadTiles * TILE_PX : 0), y + (la ? la.y / ll * CAMERA.aimLeadTiles * TILE_PX : 0)); g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5); }
-      drawUnit(g, classes[p.cls]?.shape, x, y, r, Math.atan2(p.aim?.y || 0, p.aim?.x || 1), col, glow);
+      drawUnit(g, classes[p.cls]?.shape, x, y, r, (p.facing ?? Math.atan2(p.aim?.y || 0, p.aim?.x || 1)), col, glow);
       if (p.spawnShieldLeft > 0) g.lineStyle(2, glow, FX.spawnShield.alpha + 0.3 * Math.sin(now / FX.spawnShield.pulseMs * 6.28)).strokeCircle(x, y, r + 9);
       { const z = this.cameras.main.zoom, bw = 36 / z, bh = 4 / z, by = y - r - 10 / z - bh; g.fillStyle(0x000000, 0.6).fillRect(x - bw / 2, by, bw, bh).fillStyle(col).fillRect(x - bw / 2, by, bw * p.hp / p.maxHp, bh); } // HP-bar i fast skærmstørrelse (36×4 px) uanset zoom
       if (p.id === 'me') for (let i = 0; i < classes[p.cls].weapon.charges; i++) { const f = i < p.charges ? 1 : i === p.charges ? p.chargeProgress : 0; g.fillStyle(0x000000, 0.6).fillRect(x - 18 + i * 12.5, y + r + 8, 11, 3).fillStyle(PALETTE.score).fillRect(x - 18 + i * 12.5, y + r + 8, 11 * f, 3); }

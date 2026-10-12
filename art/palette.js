@@ -60,5 +60,5 @@ export const SHAPES = {
   sniper:   { shape: 'needle',   pts: [[1.6,0],[-0.6,0.55],[-0.9,0],[-0.6,-0.55]] }, // lang spids pil
   engineer: { shape: 'square',   pts: [[0.85,0.85],[-0.85,0.85],[-0.85,-0.85],[0.85,-0.85]], nose: true }, // kasse/bygger
   scout:    { shape: 'triangle', pts: [[1.25,0],[-0.75,0.8],[-0.4,0],[-0.75,-0.8]] }, // hurtig chevron
-  support:  { shape: 'cross',    pts: [[0.35,1],[-0.35,1],[-0.35,0.35],[-1,0.35],[-1,-0.35],[-0.35,-0.35],[-0.35,-1],[0.35,-1],[0.35,-0.35],[1,-0.35],[1,0.35],[0.35,0.35]], nose: true, noRotate: true }, // plus
+  support:  { shape: 'cross',    pts: [[0.35,1],[-0.35,1],[-0.35,0.35],[-1,0.35],[-1,-0.35],[-0.35,-0.35],[-0.35,-1],[0.35,-1],[0.35,-0.35],[1,-0.35],[1,0.35],[0.35,0.35]], nose: true, noRotate: false }, // plus
 };

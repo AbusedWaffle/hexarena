@@ -10,7 +10,8 @@ export function drawUnit(g, shapeKey, x, y, r, angle, fill, glow) {
   } else {
     g.fillStyle(glow, FX.glowAlpha * 0.5).fillPoints(poly(1 + 4 / r), true).fillStyle(fill).fillPoints(poly(1), true);
   }
-  if (s.nose) { // lille lys prik, der viser sigteretningen på ikke-spidse former
-    g.fillStyle(glow).fillCircle(x + Math.cos(angle) * r * 1.45, y + Math.sin(angle) * r * 1.45, Math.max(2, r * 0.22));
-  }
+  // Løb/front: lys bjælke ud af forsiden, så retningen kan ses på alle former
+  const b = (px, py) => ({ x: x + (px * Math.cos(angle) - py * Math.sin(angle)) * r, y: y + (px * Math.sin(angle) + py * Math.cos(angle)) * r });
+  const L = s.barrel ?? 1.4, w = 0.16;
+  g.fillStyle(glow).fillPoints([b(0.55, -w), b(L, -w), b(L, w), b(0.55, w)], true);
 }
