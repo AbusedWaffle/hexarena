@@ -109,7 +109,9 @@ async function showMenu() {
 }
 
 // Spillet læser URL'en ved indlæsning. fromMenu = startet fra menuen (så "Menu" kan komme tilbage uden parametre).
-function startGame(fromMenu = false) {
+async function startGame(fromMenu = false) {
+  // lobby-overlay skal lytte før spillet melder kode/holdliste
+  if (new URLSearchParams(location.search).has('host')) await import('./lobby.js');
   import('../render/game.js');
   addCss('art/menu.css'); addCss('ui/menu.css');
   const toMenu = () => { location.href = location.pathname; };

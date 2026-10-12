@@ -1,0 +1,22 @@
+// Lobby-overlay på telefon på langs (844×390): host viser kode + QR, klient der joiner dukker op i holdlisten, Start lukker, chip genåbner.
+import { chromium } from 'playwright';
+const PORT = process.env.PORT || 8090;
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader'] });
+const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', e => errs.push(e.message));
+await pg.goto(`http://localhost:${PORT}/?host=1&net=bc&cls=Soldier`); await pg.waitForTimeout(2500);
+const inView = (sel) => pg.$eval(sel, e => { const r = e.getBoundingClientRect(); return r.width > 20 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth; });
+const code = (await pg.textContent('#lobby-code')).trim();
+const ok = { code: /^[A-Z0-9]{5}$/.test(code), codeVisible: await inView('#lobby-code'), qrVisible: await inView('#lobby-qr svg'), startVisible: await inView('#lobby-start') };
+await pg.screenshot({ path: process.env.SHOT || '/tmp/lobby.png' });
+const cl = await ctx.newPage(); await cl.goto(`http://localhost:${PORT}/?room=${code}&net=bc&cls=Sniper`); await pg.waitForTimeout(3000);
+await pg.bringToFront();
+ok.joinShown = (await pg.textContent('#lobby-roster')).includes('Spiller');
+ok.status = await pg.textContent('#lobby-status');
+await pg.$eval('#lobby-start', e => e.click()); await pg.waitForTimeout(200);
+ok.closed = await pg.$eval('#lobby', e => e.hidden) && await inView('#lobby-chip');
+await pg.$eval('#lobby-chip', e => e.click()); ok.reopen = !(await pg.$eval('#lobby', e => e.hidden));
+console.log(JSON.stringify({ code, ...ok, errs }));
+await b.close();
+const pass = ok.code && ok.codeVisible && ok.qrVisible && ok.startVisible && ok.joinShown && ok.closed && ok.reopen && !errs.length;
+process.exit(pass ? 0 : 1);
