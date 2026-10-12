@@ -1,13 +1,13 @@
 // Kompakt netværksformat for snapshots (unreliable kanal, 20 Hz). Mål: < 600 bytes som JSON.
 // Spillere refereres med indeks i rosteren, som sendes over den reliable kanal.
 const q10 = (v) => Math.round(v * 10), deg = (a) => a ? (Math.round(Math.atan2(a.y, a.x) * 180 / Math.PI) + 360) % 360 : 0;
-// players: [x, y, aimDeg, hp, alive, charges*100 + chargeProgress%, lastSeq, abilityCD*10, shield*10, invuln*10, focus*10, respawn*10] (afsluttende nuller udelades)
+// players: [x, y, aimDeg*360 + facingDeg, hp, alive, charges*100 + chargeProgress%, lastSeq, abilityCD*10, shield*10, invuln*10, focus*10, respawn*10] (afsluttende nuller udelades)
 export function encodeSnap(snap, roster) {
   const idx = new Map(roster.map((r, i) => [r.id, i]));
   const P = [];
   for (const p of snap.players) {
     const i = idx.get(p.id); if (i == null) continue;
-    const arr = [Math.round(p.x), Math.round(p.y), deg(p.aim), Math.ceil(p.hp), p.alive ? 1 : 0, p.charges * 100 + Math.min(99, Math.floor(p.chargeProgress * 100)), p.lastSeq | 0,
+    const arr = [Math.round(p.x), Math.round(p.y), deg(p.aim) * 360 + deg({ x: Math.cos(p.facing || 0), y: Math.sin(p.facing || 0) }), Math.ceil(p.hp), p.alive ? 1 : 0, p.charges * 100 + Math.min(99, Math.floor(p.chargeProgress * 100)), p.lastSeq | 0,
       q10(p.abilityCooldownLeft), q10(p.spawnShieldLeft), q10(p.invulnLeft || 0), q10(p.focusLeft || 0), q10(Math.min(99, Math.max(0, p.respawnLeft)))];
     while (arr.length > 7 && arr[arr.length - 1] === 0) arr.pop(); // nul-felter til sidst sendes ikke
     P[i] = arr;
@@ -23,7 +23,7 @@ export function decodeSnap(m, roster, remap = (id) => id) {
   const teams = ['blue', 'red'], players = [];
   m.p.forEach((a, i) => {
     if (!a) return; const r = roster[i];
-    players.push({ id: remap(r.id), team: r.team, cls: r.cls, radius: r.radius, x: a[0], y: a[1], aim: { x: Math.cos(a[2] * Math.PI / 180), y: Math.sin(a[2] * Math.PI / 180) },
+    players.push({ id: remap(r.id), team: r.team, cls: r.cls, radius: r.radius, x: a[0], y: a[1], aim: { x: Math.cos(Math.floor(a[2] / 360) * Math.PI / 180), y: Math.sin(Math.floor(a[2] / 360) * Math.PI / 180) }, facing: (a[2] % 360) * Math.PI / 180,
       alive: !!a[4], hp: a[3], maxHp: r.maxHp, charges: Math.floor(a[5] / 100), chargeProgress: (a[5] % 100) / 100,
       lastSeq: a[6], abilityCooldownLeft: (a[7] ?? 0) / 10, spawnShieldLeft: (a[8] ?? 0) / 10, invulnLeft: (a[9] ?? 0) / 10, focusLeft: (a[10] ?? 0) / 10, respawnLeft: (a[11] ?? 0) / 10 });
   });

@@ -156,7 +156,9 @@
       "grenades",
       "zones"
     ],
-    "_modes": "knockout = runder uden respawn, først til roundsToWin; tdm = gammel tilstand med respawn (durationSec/killTarget/respawnSec)."
+    "_modes": "knockout = runder uden respawn, først til roundsToWin; tdm = gammel tilstand med respawn (durationSec/killTarget/respawnSec).",
+    "facingHoldSec": 0.4,
+    "turnRateDeg": 720
   },
   "_ai": {
     "maxRetreatingPerTeam": 1,

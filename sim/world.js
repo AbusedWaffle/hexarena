@@ -35,7 +35,7 @@ export function setClass(w, p, cls) {
   spawn(w, p);
 }
 
-function spawn(w, p) {
+function spawn(w, p) { p.facing = null; p.aimHoldLeft = 0;
   // Ledig spawn længst fra synlige fjender (fjender uden synslinje tæller svagere)
   const list = w.map.spawns[p.team]; let s = list[0], best = -Infinity;
   for (const c of list) {
@@ -347,18 +347,20 @@ export function step(w, inputs) {
     const x0 = p.x, y0 = p.y;
     moveBy(w, p, m.x / mn * v, m.y / mn * v);
     p.vx = (p.x - x0) / DT; p.vy = (p.y - y0) / DT; p.moveDir = ml > 0.1 ? { x: m.x / mn, y: m.y / mn } : null;
-    if (inp.aim && Math.hypot(inp.aim.x, inp.aim.y) > 0.01) p.aim = { x: inp.aim.x, y: inp.aim.y };
+    if (inp.aim && Math.hypot(inp.aim.x, inp.aim.y) > 0.01) { p.aim = { x: inp.aim.x, y: inp.aim.y }; p.aimHoldLeft = rg.facingHoldSec ?? 0.4; }
     autoAimPick(w, p, wp.range * U); // opdaterer autoTargetId hvert tick (HUD viser det mål, et tap rammer)
     if (inp.fire && !p.salvo && p.charges > 0 && p.fireCooldownLeft === 0) {
       let dir = inp.aim, auto = false;
       if (!dir) { const t = autoAimTarget(w, p, wp.range * U); const lp = t && leadPoint(w, p, t, wp); dir = t ? { x: lp.x - p.x, y: lp.y - p.y } : p.aim; auto = true; }
-      p.aim = dir; p.charges--; p.fireCooldownLeft = wp.fireCooldownSec; p.spawnShieldLeft = 0;
+      p.aim = dir; p.aimHoldLeft = rg.facingHoldSec ?? 0.4; p.charges--; p.fireCooldownLeft = wp.fireCooldownSec; p.spawnShieldLeft = 0;
       const ab = c.ability, focus = p.focusLeft > 0 && ab?.id === 'focus' ? { damageMult: ab.damageMult, pierce: ab.pierce } : null;
       if (focus) p.focusLeft = 0; // Fokus bruges af næste salve
       p.salvo = { dir, auto, left: wp.shotsPerCharge, next: 0, focus, targetId: auto ? p.autoTargetId : null };
     }
-    if (inp.ability && p.abilityCooldownLeft === 0 && c.ability && useAbility(w, p, inp)) { p.abilityCooldownLeft = c.ability.cooldownSec; p.spawnShieldLeft = 0; w.events.push({ type: 'ability', id: p.id, ability: c.ability.id }); }
+    if (inp.ability && p.abilityCooldownLeft === 0 && c.ability && useAbility(w, p, inp)) { p.aimHoldLeft = rg.facingHoldSec ?? 0.4; p.abilityCooldownLeft = c.ability.cooldownSec; p.spawnShieldLeft = 0; w.events.push({ type: 'ability', id: p.id, ability: c.ability.id }); }
   }
+  // Retning figuren vender: sigteretning under sigte/skud/ability (holdes facingHoldSec efter), ellers gåretningen; drejer blødt med turnRateDeg/s
+  for (const p of w.players) if (p.alive) updateFacing(p, w.classes._match);
   for (const p of w.players) {
     if (!p.salvo || !p.alive) { p.salvo = null; continue; }
     p.salvo.next -= DT * 1000;
@@ -388,10 +390,21 @@ export function step(w, inputs) {
   }
 }
 
+export function updateFacing(p, rg) {
+  p.aimHoldLeft = Math.max(0, (p.aimHoldLeft || 0) - DT);
+  const d = p.salvo || p.aimHoldLeft > 0 ? p.aim : p.moveDir;
+  if (p.facing == null) p.facing = Math.atan2(p.aim?.y || 0, p.aim?.x || 1);
+  if (!d || Math.hypot(d.x, d.y) < 1e-3) return;
+  const want = Math.atan2(d.y, d.x), max = (rg.turnRateDeg ?? 720) * Math.PI / 180 * DT;
+  let diff = ((want - p.facing + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  p.facing = p.facing + Math.max(-max, Math.min(max, diff));
+  if (p.facing > Math.PI) p.facing -= 2 * Math.PI; else if (p.facing < -Math.PI) p.facing += 2 * Math.PI;
+}
+
 // Snapshot til render, HUD og netværk (samme felter overalt)
 export function snapshot(w) {
   return { tick: w.tick, match: { mode: w.match.mode, score: { ...w.match.score }, round: w.match.round, roundIntroLeft: w.match.roundIntroLeft, timeLeft: w.match.timeLeft, over: w.match.over },
-    players: w.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, radius: p.radius, x: p.x, y: p.y, aim: p.aim, alive: p.alive, hp: p.hp, maxHp: p.maxHp,
+    players: w.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, radius: p.radius, x: p.x, y: p.y, aim: p.aim, facing: p.facing ?? 0, alive: p.alive, hp: p.hp, maxHp: p.maxHp,
       charges: p.charges, chargeProgress: p.chargeProgress, abilityCooldownLeft: p.abilityCooldownLeft, spawnShieldLeft: p.spawnShieldLeft, invulnLeft: p.invulnLeft, focusLeft: p.focusLeft, respawnLeft: p.respawnLeft, autoTargetId: p.autoTargetId ?? null, lastSeq: p.lastSeq })),
     projectiles: w.projectiles.map(b => ({ id: b.id, team: b.team, x: b.x, y: b.y })),
     grenades: w.grenades.map(g => ({ id: g.id, team: g.team, from: g.from, x: g.x, y: g.y, fuse: g.fuse, fuseSec: g.fuseSec, radius: g.radius })),
