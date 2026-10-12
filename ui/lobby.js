@@ -18,7 +18,7 @@ const CSS = `
 .hl-mi.ha-btn.sel,.hl-mi.ha-btn:hover{border-left-color:#4FA3FF;background:linear-gradient(90deg,rgba(79,163,255,.4),rgba(79,163,255,0))}
 .hl-card{display:flex;gap:10px;align-items:stretch;min-height:0;flex:1;max-height:230px}
 .hl-map{position:relative;flex:1;min-width:0;border:1px solid var(--ha-edge,#22305A);background:#0B1030;overflow:hidden}
-.hl-map canvas{width:100%;height:100%;object-fit:contain;display:block}
+.hl-map canvas{width:100%;height:100%;object-fit:contain;display:block;image-rendering:pixelated}
 .hl-mapname{position:absolute;right:6px;bottom:4px;font-size:11px;letter-spacing:.15em;opacity:.8;text-transform:uppercase}
 .hl-mapcode{position:absolute;left:6px;top:4px;font-size:11px;letter-spacing:.12em;background:rgba(6,9,26,.7);padding:1px 5px}
 .hl-codebox{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
@@ -37,6 +37,13 @@ const CSS = `
 .hl-gap{height:4px;flex:none}
 .hl-count{margin-top:auto;align-self:flex-end;font-size:clamp(18px,7vh,40px);font-weight:700;letter-spacing:.08em;opacity:.25;line-height:1;padding-bottom:4px}
 .hl-tick{grid-column:1/-1;margin:0 calc(-1*max(16px,env(safe-area-inset-left)));padding:5px 16px max(5px,env(safe-area-inset-bottom));background:rgba(79,163,255,.14);border-top:1px solid rgba(79,163,255,.4);font-size:clamp(10px,3vh,13px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hl-card{max-height:none}
+.hl-modal{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;background:rgba(6,9,26,.7)}
+.hl-mbox{display:flex;gap:clamp(12px,3vw,28px);align-items:center;padding:clamp(10px,3vh,22px) clamp(14px,3vw,28px);background:var(--ha-panel,#0B1030);border:1px solid var(--ha-edge,#22305A);border-left:4px solid #4FA3FF;max-height:calc(100% - 16px);box-sizing:border-box}
+.hl-mbox .hl-qr{height:clamp(120px,62vh,300px)}
+.hl-mcol{display:flex;flex-direction:column;gap:clamp(6px,2vh,12px)}
+.hl-mbox .hl-code{font-size:clamp(36px,13vh,72px)}
+.hl-mbox .ha-btn{min-height:40px}
 .hl-chip{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;font:600 13px 'Roboto Mono',monospace;padding:6px 10px;border-radius:8px;background:rgba(6,9,26,.8);color:#E6ECFF;border:1px solid #4FA3FF;cursor:pointer}
 `;
 
@@ -45,7 +52,7 @@ const qs = new URLSearchParams(location.search);
 const title = MODES[(qs.get('mode') || '').toLowerCase()] || 'HOLDKAMP';
 const ICONS = ['assault', 'sniper', 'engineer', 'scout', 'support'];
 
-let code = null, roster = [], status = 'connecting', error = '', open = true, map = null;
+let showCode = false, code = null, roster = [], status = 'connecting', error = '', open = true, map = null;
 fetch(new URL('../data/map_paintyard_sq_01.json', import.meta.url)).then(r => r.json()).then(m => { map = m; render(); }).catch(() => {});
 const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; };
 const st = el('style'); st.textContent = CSS; document.head.append(st);
@@ -83,24 +90,25 @@ function render() {
   const L = el('div', 'hl-l'), R = el('div', 'hl-r');
   const menu = el('div', 'hl-menu');
   const start = el('button', 'hl-mi sel ha-btn primary', 'START KAMPEN'); start.id = 'lobby-start';
-  start.onclick = () => { open = false; render(); };
-  const share = el('button', 'hl-mi ha-btn', navigator.share ? 'DEL LINK' : 'KOPIÉR LINK'); share.id = 'lobby-share';
-  share.onclick = async () => {
-    try { if (navigator.share) await navigator.share({ title: 'HexArena', text: 'Spil med! Kode ' + code, url: link() }); else { await navigator.clipboard.writeText(link()); share.textContent = 'KOPIERET ✓'; } }
-    catch { try { await navigator.clipboard.writeText(link()); share.textContent = 'KOPIERET ✓'; } catch {} }
-  };
+  start.onclick = () => { open = false; showCode = false; render(); };
+  const mkShare = (cls) => { const b = el('button', cls, navigator.share ? 'DEL LINK' : 'KOPIÉR LINK');
+    b.onclick = async () => {
+      try { if (navigator.share) await navigator.share({ title: 'HexArena', text: 'Spil med! Kode ' + code, url: link() }); else { await navigator.clipboard.writeText(link()); b.textContent = 'KOPIERET ✓'; } }
+      catch { try { await navigator.clipboard.writeText(link()); b.textContent = 'KOPIERET ✓'; } catch {} }
+    }; return b; };
+  const share = mkShare('hl-mi ha-btn'); share.id = 'lobby-share';
+  const show = el('button', 'hl-mi ha-btn', 'VIS KODE'); show.id = 'lobby-show-code';
+  show.onclick = () => { showCode = true; render(); };
   const back = el('button', 'hl-mi ha-btn', 'MENU'); back.onclick = () => { location.href = location.pathname; };
-  for (const b of [start, share, back]) b.onmouseenter = () => menu.querySelectorAll('.hl-mi').forEach(x => x.classList.toggle('sel', x === b));
-  menu.append(start, share, back);
+  for (const b of [start, show, share, back]) b.onmouseenter = () => menu.querySelectorAll('.hl-mi').forEach(x => x.classList.toggle('sel', x === b));
+  menu.append(start, show, share, back);
 
   const card = el('div', 'hl-card');
   const mp = el('div', 'hl-map'); mp.append(drawMap(), el('div', 'hl-mapcode', 'KODE ' + code), el('div', 'hl-mapname', map?.name || 'Paintyard'));
-  const cb = el('div', 'hl-codebox');
   const q = qrcode(0, 'M'); q.addData(link()); q.make();
   const qr = el('div', 'hl-qr'); qr.id = 'lobby-qr'; qr.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
   const codeEl = el('div', 'hl-code', code); codeEl.id = 'lobby-code';
-  cb.append(qr, el('div', 'hl-sub', 'Spilkode'), codeEl);
-  card.append(mp, cb);
+  card.append(mp);
   const s = el('div', 'hl-status' + (status === 'error' ? ' err' : ''),
     status === 'error' ? 'Netværksfejl: ' + error : status === 'open' ? 'Klar – venner kan nu deltage med koden' : 'Opretter spil…');
   s.id = 'lobby-status';
@@ -115,6 +123,14 @@ function render() {
 
   const tick = el('div', 'hl-tick', `Del koden ${code} med dine venner – de kan scanne QR-koden eller åbne linket`);
   wrap.append(L, R, tick);
+  if (showCode) {
+    const m = el('div', 'hl-modal'), box = el('div', 'hl-mbox'), col = el('div', 'hl-mcol');
+    const close = el('button', 'ha-btn primary', 'LUK'); close.id = 'lobby-code-close';
+    close.onclick = () => { showCode = false; render(); };
+    m.onclick = (e) => { if (e.target === m) close.onclick(); };
+    col.append(el('div', 'hl-sub', 'Spilkode'), codeEl, mkShare('ha-btn'), close);
+    box.append(qr, col); m.append(box); wrap.append(m);
+  }
 }
 
 globalThis.addEventListener('hexarena:lobby', (e) => {
