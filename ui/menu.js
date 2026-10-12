@@ -98,6 +98,7 @@ async function startGame(fromMenu = false) {
   // lobby-overlay skal lytte før spillet melder kode/holdliste
   // Alle kampe går gennem lobbyen (lokal, host og klient); ?lobby=0 springer den over (tests/debug).
   if (new URLSearchParams(location.search).get('lobby') !== '0') await import('./lobby.js');
+  await import('./spectate.js'); // tilskuer-bjælke (hexarena:spectate)
   import('../render/game.js');
   addCss('art/menu.css'); addCss('ui/menu.css');
   const toMenu = () => { location.href = location.pathname; };

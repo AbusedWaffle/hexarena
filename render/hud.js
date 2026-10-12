@@ -105,9 +105,11 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
       if (lastRoundMsg && scene.time.now - lastRoundMsg.t < 2500 && !m.over) center.setText(lastRoundMsg.text).setColor(lastRoundMsg.color);
       else if (knockout && intro > 0 && !m.over) center.setText(`RUNDE ${m.round || 1}\n${Math.ceil(intro)}`).setColor(hexStr(PALETTE.score));
       else if (m.over) center.setText(m.score.blue === m.score.red ? 'UAFGJORT' : (m.score.blue > m.score.red) === (me.team === 'blue') ? 'SEJR' : 'NEDERLAG').setColor(hexStr(PALETTE.score));
-      else if (!me.alive && knockout) center.setText('Du er ude – ser med').setColor(hexStr(PALETTE.text))
+      // som tilskuer står beskeden lavt og lille, så den ikke dækker holdkammeraten i midten (bjælken øverst kommer fra ui/spectate.js)
+      else if (!me.alive && knockout) center.setText('Du er ude – ser med').setColor(hexStr(PALETTE.text)).setFontSize(globalThis.__spectate?.id ? 24 : 40).setY(globalThis.__spectate?.id ? 600 : 300)
       else if (!me.alive) center.setText(`Respawn om ${Math.max(0, me.respawnLeft).toFixed(1)}`).setColor(hexStr(PALETTE.text));
       else center.setText('');
+      if (!(!me.alive && knockout && !m.over && !(lastRoundMsg && scene.time.now - lastRoundMsg.t < 2500) && !(intro > 0))) center.setFontSize(40).setY(300);
     },
   };
 }
