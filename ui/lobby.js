@@ -52,7 +52,7 @@ const qs = new URLSearchParams(location.search);
 const title = MODES[(qs.get('mode') || '').toLowerCase()] || 'HOLDKAMP';
 const ICONS = ['assault', 'sniper', 'engineer', 'scout', 'support'];
 
-let showCode = false, code = null, roster = [], status = 'connecting', error = '', open = true, map = null;
+let started = false, showCode = false, code = null, roster = [], status = 'connecting', error = '', open = true, map = null;
 fetch(new URL('../data/map_paintyard_sq_01.json', import.meta.url)).then(r => r.json()).then(m => { map = m; render(); }).catch(() => {});
 const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; };
 const st = el('style'); st.textContent = CSS; document.head.append(st);
@@ -89,8 +89,13 @@ function render() {
   wrap.replaceChildren();
   const L = el('div', 'hl-l'), R = el('div', 'hl-r');
   const menu = el('div', 'hl-menu');
-  const start = el('button', 'hl-mi sel ha-btn primary', 'START KAMPEN'); start.id = 'lobby-start';
-  start.onclick = () => { open = false; showCode = false; render(); };
+  const start = el('button', 'hl-mi sel ha-btn primary', started ? 'TILBAGE TIL KAMPEN' : 'START KAMPEN'); start.id = 'lobby-start';
+  start.onclick = () => {
+    open = false; showCode = false;
+    // første tryk starter kampen: game.js holder simulering/rundeur stille indtil dette event (sendes kun én gang)
+    if (!started) { started = true; globalThis.__lobbyStarted = true; globalThis.dispatchEvent(new CustomEvent('hexarena:lobby-start', { detail: { code } })); }
+    render();
+  };
   const mkShare = (cls) => { const b = el('button', cls, navigator.share ? 'DEL LINK' : 'KOPIÉR LINK');
     b.onclick = async () => {
       try { if (navigator.share) await navigator.share({ title: 'HexArena', text: 'Spil med! Kode ' + code, url: link() }); else { await navigator.clipboard.writeText(link()); b.textContent = 'KOPIERET ✓'; } }
