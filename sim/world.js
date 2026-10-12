@@ -317,6 +317,15 @@ function resetRound(w) {
   w.events.push({ type: 'roundStart', round: m.round, introSec: m.roundIntroLeft, score: { ...m.score } });
 }
 
+// Ny kamp fra lobbyen: nulstiller score og runde og placerer alle ved spawn (bruger _match.roundsToWin/roundTimeSec, som lobbyen har sat)
+export function startMatch(w) {
+  w.match = newMatch(w.classes._match); w.match.round = 0;
+  for (const p of w.players) { p.kills = 0; p.deaths = 0; }
+  resetRound(w); if (w.match.mode !== 'knockout') { w.match.roundIntroLeft = 0; w.match.timeLeft = w.classes._match.durationSec; }
+}
+// Team-skift i lobbyen
+export function setTeam(w, p, team) { p.team = team; spawn(w, p); }
+
 function endMatch(w) { if (!w.match.over) { w.match.over = true; const s = w.match.score; w.events.push({ type: 'matchOver', winner: s.blue === s.red ? 'draw' : s.blue > s.red ? 'blue' : 'red', score: { ...s } }); } }
 
 // inputs: { [playerId]: InputFrame }  InputFrame = { move:{x,y}, aim:{x,y}|null, fire, ability, seq }

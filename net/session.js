@@ -44,8 +44,11 @@ export function createHostSession(world, transport, opts = {}) {
         if (fp && ai?.bots?.has(fid)) { ai.removeBot(fid); p = fp; slots.set(key, fid); }
       }
       if (!p) { p = pickSlot(world.classes[m.cls] ? m.cls : null); if (!p) { transport.send(key, 'r', { t: 'full' }); return; } slots.set(key, p.id); }
-      transport.send(key, 'r', { t: 'welcome', you: p.id, roster: roster(), tiles: tileState(), tick: world.tick });
+      transport.send(key, 'r', { t: 'welcome', you: p.id, roster: roster(), tiles: tileState(), tick: world.tick, settings: opts.settings?.() ?? null, started: !!opts.started?.() });
       sendRoster();
+    } else if (m.t === 'cls') { // klasseskift fra lobbyen (kun før kampen starter)
+      const id = slots.get(key), p = id && world.players.find(q => q.id === id);
+      if (p && world.classes[m.cls] && !opts.started?.()) { setClass(world, p, m.cls); sendRoster(); }
     } else if (m.t === 'in') {
       const id = slots.get(key); if (!id) return;
       const st = inputs.get(id) || { frame: null, lastSeq: 0, fire: false, ability: false };
@@ -75,6 +78,7 @@ export function createHostSession(world, transport, opts = {}) {
       if (snap.events.length) transport.broadcast('r', { t: 'ev', k: snap.tick, e: snap.events.filter(e => !(e.type === 'shot' && !e.hitscan)).map(e => roundEvent(e)) });
     },
     roster, sendRoster,
+    sendSettings(settings, started = false) { transport.broadcast('r', { t: 'settings', settings, started }); },
   };
 }
 const roundEvent = (e) => { const o = {}; for (const [k, v] of Object.entries(e)) o[k] = typeof v === 'number' ? Math.round(v * 10) / 10 : v && typeof v === 'object' ? roundEvent(v) : v; return o; };
@@ -110,11 +114,12 @@ export function createClientSession(transport, opts) {
   transport.onPeerJoin(() => transport.send('host', 'r', { t: 'hello', cls: opts.cls, name: opts.name }));
   transport.onMessage((_k, ch, m) => {
     if (m.t === 'welcome') {
-      you = m.you; syncRoster(m.roster);
+      you = m.you; syncRoster(m.roster); if (m.settings) opts.onSettings?.(m.settings, m.started);
       for (const [x, y, hp, maxHp] of m.tiles) { const t = world.tiles.get(x + ',' + y); if (!t) continue; t.type = hp > 0 ? 'crate' : 'floor'; t.hp = hp; t.maxHp = maxHp; }
       opts.onWelcome?.(world.players.find(p => p.id === 'me'));
     } else if (m.t === 'roster') syncRoster(m.roster);
     else if (m.t === 'full') opts.onFull?.();
+    else if (m.t === 'settings') opts.onSettings?.(m.settings, m.started);
     else if (m.t === 'ev') { for (const e0 of m.e) { const e = remapEvent(e0, remap); applyTileEvent(e); eventQueue.push(e);
       if (e.score) { world.match.score = { ...e.score }; if (view) view.match = { ...view.match, score: { ...e.score }, over: view.match.over || e.type === 'matchOver' }; } } }
     else if (m.t === 's' && you) {
@@ -131,6 +136,7 @@ export function createClientSession(transport, opts) {
   });
   return {
     world, get you() { return you; }, get ready() { return !!(you && view); },
+    setClass(cls) { transport.send('host', 'r', { t: 'cls', cls }); },
     sendInput(f) { // kaldes hvert lokalt tick (20 Hz) med egen InputFrame
       pending.push(f); if (pending.length > 60) pending.shift();
       const me = world.players.find(p => p.id === 'me');

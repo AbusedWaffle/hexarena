@@ -3,7 +3,7 @@ import { drawUnit } from '../art/shapes.js';
 import { AbilityFx } from '../art/abilityFx.js';
 import { TILE_PX } from '../sim/grid.js';
 import { drawSquareMap } from '../art/squareMap.js';
-import { createWorld, addPlayer, step, snapshot, raycast, DT } from '../sim/world.js';
+import { createWorld, addPlayer, step, snapshot, raycast, DT, setClass, setTeam, startMatch } from '../sim/world.js';
 import { createInputSystem } from './inputSystem.js';
 import { createHud } from './hud.js';
 import { createAI } from '../sim/ai.js';
@@ -14,7 +14,9 @@ const [map, classes, aiCfg] = await Promise.all(['data/map_paintyard_sq_01.json'
 // URL: ?diff=easy|normal|hard  &red=3 (antal røde bots)  &blue=0 (blå holdkammerater)  &aidebug=1
 const QS = new URLSearchParams(location.search), AI_DIFF = QS.get('diff') || 'normal', AI_DEBUG = QS.has('aidebug');
 // Multiplayer: ?host=1 opretter et spil (kode vises), ?room=KODE deltager. Ellers singleplayer mod bots.
-addEventListener('hexarena:lobby-start', () => { globalThis.__lobbyStarted = true; });
+addEventListener('hexarena:lobby-start', () => { globalThis.__lobbyStarted = true; globalThis.__arena?.onLobbyStart?.(); });
+// ?lobby=1: også spil mod robotter starter i lobbyen (menuen sætter det). Uden den starter et lokalt spil straks, som testlinks forventer.
+const LOBBY = QS.has('host') || QS.has('lobby');
 const ROOM = (QS.get('room') || '').toUpperCase(), MODE = ROOM ? 'client' : QS.has('host') ? 'host' : 'local';
 const MY_CLS = classes[QS.get('cls')] ? QS.get('cls') : 'Assault';
 // Kamera-tal: synsfelt i tiles, følge-blødhed (andel pr. frame ved 60 fps; 0,15 ≈ 0,1 s forsinkelse) og fremskydning under manuel sigte
@@ -26,8 +28,9 @@ class Arena extends Phaser.Scene {
     this.ai = null; this.net = null; this.client = null;
     if (MODE === 'client') {
       this.client = createClientSession((QS.get('net') === 'bc' ? createBcClient : createPeerClient)(ROOM), { map, classes, cls: MY_CLS,
-        onWelcome: (me) => { this.me = me; }, onFull: () => this.netMsg?.setText('Spillet er fuldt') });
+        onWelcome: (me) => { this.me = me; }, onSettings: (st, started) => { globalThis.__lobbySettings = st; globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { mode: 'client', isHost: false, settings: st, started } })); }, onFull: () => this.netMsg?.setText('Spillet er fuldt') });
       this.world = this.client.world;
+      addEventListener('hexarena:lobby-class', (e) => { if (classes[e.detail?.cls]) this.client.setClass(e.detail.cls); });
       this.me = { x: 0, y: 0, team: 'blue', cls: MY_CLS, alive: false }; // pladsholder, indtil hosten svarer
     } else {
       this.world = createWorld(map, classes);
@@ -42,11 +45,20 @@ class Arena extends Phaser.Scene {
         const code = makeCode(), tr = (QS.get('net') === 'bc' ? createBcHost : createPeerHost)(code);
         // Lobby-overlay (ui/lobby.js) lytter på 'hexarena:lobby' og viser kode, QR, holdliste og status.
         const lobby = (d) => globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { code, ...d } }));
-        this.net = createHostSession(this.world, tr, { ai: this.ai, aiDifficulty: AI_DIFF, onRoster: (r) => lobby({ roster: r }) });
+        this.net = createHostSession(this.world, tr, this.netOpts = { ai: this.ai, aiDifficulty: AI_DIFF, onRoster: (r) => { lobby({ roster: r }); if (!this.started) this.applyLobbySettings(this.settings, true); },
+          settings: () => this.settings, started: () => !!this.started });
         tr.onStatus((st, info) => lobby(st === 'open' ? { status: 'open', roster: this.net.roster() } : { status: 'error', error: String(info) }));
         lobby({ status: 'connecting' });
         this.code = code;
       }
+      this.lobbyEmit = MODE === 'host' ? (d) => globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { code: this.code, ...d } })) : (d) => globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: d }));
+      if (LOBBY) {
+        this.settings = null; this.started = false;
+        addEventListener('hexarena:lobby-settings', (e) => this.applyLobbySettings(e.detail?.settings));
+        addEventListener('hexarena:lobby-class', (e) => { if (!this.started && classes[e.detail?.cls]) { setClass(this.world, this.me, e.detail.cls); this.net?.sendRoster(); this.lobbyEmit({ roster: this.rosterNow() }); } });
+        if (globalThis.__lobbySettings) this.applyLobbySettings(globalThis.__lobbySettings);
+        this.lobbyEmit({ mode: MODE, isHost: true, settings: this.settings, roster: this.rosterNow() });
+      } else this.started = true;
     }
     this.prev = this.cur = MODE === 'client' ? null : snapshot(this.world); this.acc = 0;
     this.staticG = this.add.graphics(); this.drawMap();
@@ -65,6 +77,28 @@ class Arena extends Phaser.Scene {
     this.help = this.hudUI.add(this.add.text(16, 690, 'WASD bevæg · venstreklik hold+slip = skyd · mellemrum = auto-aim · E = ability · højreklik hold+slip = sigtet ability', { fontSize: 12, color: '#5a6385' }).setScrollFactor(0).setDepth(10).setVisible(!this.sys.game.device.input.touch));
     this.netMsg = MODE !== 'client' ? null : this.add.text(640, 60, 'Forbinder til ' + ROOM + '...', { fontFamily: 'Roboto Mono, monospace', fontSize: 16, color: hexStr(PALETTE.text), align: 'center', backgroundColor: '#06091Acc', padding: { x: 10, y: 6 } }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(11);
     this.t = 0; globalThis.__arena = this; // dev-hook til UI-test
+    if (globalThis.__lobbyStarted) this.onLobbyStart(); // 'Start kampen' kom før scenen var klar
+  }
+  rosterNow() { return this.net ? this.net.roster() : this.world.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, human: p.id === 'me' })); }
+  // Lobby-indstillinger (kun host/lokal): holdstørrelse, bots til/fra, antal, sværhedsgrad, runder og rundelængde. Træder i kraft ved 'Start kampen'.
+  applyLobbySettings(st, quiet = false) {
+    if (this.started) return; if (st) this.settings = { ...this.settings, ...st }; st = this.settings; if (!st) return;
+    const w = this.world, mc = w.classes._match, size = Math.max(1, Math.min(4, st.teamSize | 0 || 3));
+    mc.maxPerTeam = size; if (st.roundsToWin) mc.roundsToWin = +st.roundsToWin; if (st.roundTimeSec) mc.roundTimeSec = +st.roundTimeSec;
+    const diff = st.botDifficulty || AI_DIFF; if (this.netOpts) this.netOpts.aiDifficulty = diff;
+    const isHuman = (p) => p.id === 'me' || (this.net && [...this.net.slots.values()].includes(p.id));
+    for (const p of [...w.players]) if (!isHuman(p)) { this.ai.removeBot(p.id); w.players.splice(w.players.indexOf(p), 1); }
+    const count = (t) => w.players.filter(p => p.team === t).length;
+    for (const p of w.players) { const o = p.team === 'blue' ? 'red' : 'blue'; if (count(p.team) > size && count(o) < size) setTeam(w, p, o); } // for mange mennesker på et hold
+    const order = ['Assault', 'Sniper', 'Scout', 'Engineer', 'Support'];
+    let bots = st.bots === false ? 0 : Math.min(st.botCount ?? 2 * size, 2 * size - w.players.length), n = 0;
+    while (bots-- > 0) { const team = count('red') <= count('blue') ? 'red' : 'blue'; if (count(team) >= size) break; this.ai.addBot(addPlayer(w, { team, cls: order[n % 5], id: 'bot' + team[0].toUpperCase() + (this.botSeq = (this.botSeq || 0) + 1) }).id, diff); n++; }
+    this.lobbyEmit({ settings: st, roster: this.rosterNow() });
+    if (this.net) { this.net.sendSettings(st); if (!quiet) this.net.sendRoster(); }
+  }
+  onLobbyStart() {
+    if (this.started || !LOBBY || MODE === 'client') return;
+    this.started = true; startMatch(this.world); this.net?.sendSettings(this.settings, true); this.net?.sendRoster();
   }
   hostText(code, roster) {
     const humans = roster.filter(r => r.human).length, url = location.origin + location.pathname + '?room=' + code;
@@ -88,7 +122,7 @@ class Arena extends Phaser.Scene {
         this.prev = this.cur; this.cur = v;
       } else {
         // Host: kampen står stille i lobbyen, indtil 'Start kampen' (hexarena:lobby-start / __lobbyStarted). Lokalt spil starter med det samme.
-        if (MODE === 'host' && !globalThis.__lobbyStarted) {
+        if (LOBBY && !this.started) {
           this.net?.frames(); this.input_.frame(); // tøm input, så intet hober sig op
           const s = snapshot(this.world); s.events = []; s.match.roundIntroLeft = Math.max(s.match.roundIntroLeft || 0, 0.1); // >0: klienter forudsiger ikke bevægelse
           this.prev = this.cur = s; this.net?.publish(s); continue;

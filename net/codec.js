@@ -22,7 +22,7 @@ export function encodeSnap(snap, roster) {
 export function decodeSnap(m, roster, remap = (id) => id) {
   const teams = ['blue', 'red'], players = [];
   m.p.forEach((a, i) => {
-    if (!a) return; const r = roster[i];
+    const r = roster[i]; if (!a || !r) return; // roster kan være skiftet i lobbyen før næste roster-besked
     players.push({ id: remap(r.id), team: r.team, cls: r.cls, radius: r.radius, x: a[0], y: a[1], aim: { x: Math.cos(Math.floor(a[2] / 360) * Math.PI / 180), y: Math.sin(Math.floor(a[2] / 360) * Math.PI / 180) }, facing: (a[2] % 360) * Math.PI / 180,
       alive: !!a[4], hp: a[3], maxHp: r.maxHp, charges: Math.floor(a[5] / 100), chargeProgress: (a[5] % 100) / 100,
       lastSeq: a[6], abilityCooldownLeft: (a[7] ?? 0) / 10, spawnShieldLeft: (a[8] ?? 0) / 10, invulnLeft: (a[9] ?? 0) / 10, focusLeft: (a[10] ?? 0) / 10, respawnLeft: (a[11] ?? 0) / 10 });
