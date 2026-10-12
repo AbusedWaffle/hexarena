@@ -14,6 +14,7 @@ const [map, classes, aiCfg] = await Promise.all(['data/map_paintyard_sq_01.json'
 // URL: ?diff=easy|normal|hard  &red=3 (antal røde bots)  &blue=0 (blå holdkammerater)  &aidebug=1
 const QS = new URLSearchParams(location.search), AI_DIFF = QS.get('diff') || 'normal', AI_DEBUG = QS.has('aidebug');
 // Multiplayer: ?host=1 opretter et spil (kode vises), ?room=KODE deltager. Ellers singleplayer mod bots.
+addEventListener('hexarena:spectate-next', () => { const S = globalThis.__arena?.spec; if (S?.id) S.next = true; });
 addEventListener('hexarena:lobby-start', () => { globalThis.__lobbyStarted = true; globalThis.__arena?.onLobbyStart?.(); });
 // ?lobby=1: også spil mod robotter starter i lobbyen (menuen sætter det). Uden den starter et lokalt spil straks, som testlinks forventer.
 const LOBBY = QS.has('host') || QS.has('lobby');
@@ -28,7 +29,7 @@ class Arena extends Phaser.Scene {
     this.ai = null; this.net = null; this.client = null;
     if (MODE === 'client') {
       this.client = createClientSession((QS.get('net') === 'bc' ? createBcClient : createPeerClient)(ROOM), { map, classes, cls: MY_CLS,
-        onWelcome: (me) => { this.me = me; }, onSettings: (st, started) => { globalThis.__lobbySettings = st; globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { mode: 'client', isHost: false, settings: st, started } })); }, onFull: () => this.netMsg?.setText('Spillet er fuldt') });
+        onWelcome: (me) => { this.me = me; }, onSettings: (st, started) => { globalThis.__lobbySettings = st; globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { mode: 'client', isHost: false, status: 'open', settings: st, started: !!started } })); }, onFull: () => this.netMsg?.setText('Spillet er fuldt') });
       this.world = this.client.world;
       addEventListener('hexarena:lobby-class', (e) => { if (classes[e.detail?.cls]) this.client.setClass(e.detail.cls); });
       this.me = { x: 0, y: 0, team: 'blue', cls: MY_CLS, alive: false }; // pladsholder, indtil hosten svarer
@@ -82,7 +83,7 @@ class Arena extends Phaser.Scene {
   rosterNow() { return this.net ? this.net.roster() : this.world.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, human: p.id === 'me' })); }
   // Lobby-indstillinger (kun host/lokal): holdstørrelse, bots til/fra, antal, sværhedsgrad, runder og rundelængde. Træder i kraft ved 'Start kampen'.
   applyLobbySettings(st, quiet = false) {
-    if (this.started) return; if (st) this.settings = { ...this.settings, ...st }; st = this.settings; if (!st) return;
+    if (this.started) return; if (st) this.settings = { ...this.settings, ...(st.botCount != null && !('botFill' in st) ? { botFill: false } : {}), ...st }; st = this.settings; if (!st) return;
     const w = this.world, mc = w.classes._match, size = Math.max(1, Math.min(4, st.teamSize | 0 || 3));
     mc.maxPerTeam = size; if (st.roundsToWin) mc.roundsToWin = +st.roundsToWin; if (st.roundTimeSec) mc.roundTimeSec = +st.roundTimeSec;
     const diff = st.botDifficulty || AI_DIFF; if (this.netOpts) this.netOpts.aiDifficulty = diff;
@@ -91,7 +92,7 @@ class Arena extends Phaser.Scene {
     const count = (t) => w.players.filter(p => p.team === t).length;
     for (const p of w.players) { const o = p.team === 'blue' ? 'red' : 'blue'; if (count(p.team) > size && count(o) < size) setTeam(w, p, o); } // for mange mennesker på et hold
     const order = ['Assault', 'Sniper', 'Scout', 'Engineer', 'Support'];
-    let bots = st.bots === false ? 0 : Math.min(st.botCount ?? 2 * size, 2 * size - w.players.length), n = 0;
+    let bots = st.bots === false ? 0 : Math.min(st.botFill ? 2 * size : (st.botCount ?? 2 * size), 2 * size - w.players.length), n = 0;
     while (bots-- > 0) { const team = count('red') <= count('blue') ? 'red' : 'blue'; if (count(team) >= size) break; this.ai.addBot(addPlayer(w, { team, cls: order[n % 5], id: 'bot' + team[0].toUpperCase() + (this.botSeq = (this.botSeq || 0) + 1) }).id, diff); n++; }
     this.lobbyEmit({ settings: st, roster: this.rosterNow() });
     if (this.net) { this.net.sendSettings(st); if (!quiet) this.net.sendRoster(); }
@@ -155,13 +156,36 @@ class Arena extends Phaser.Scene {
     if (!this.cur) return; // klient: venter på første snapshot
     this.draw(this.acc / DT);
   }
+  // Død: kameraet bliver 1 s på dødsstedet, følger så nærmeste holdkammerat i live; 'hexarena:spectate-next' skifter;
+  // dør den fulgte, skiftes efter 1 s; er alle døde, bliver kameraet hos den sidste. Udsender 'hexarena:spectate' {id, cls, name, alive, count}.
+  updateSpectate(now) {
+    const ps = this.cur.players, me = ps.find(p => p.id === 'me'), S = this.spec || (this.spec = { id: null, wait: 0 });
+    if (!me || me.alive) { if (S.id !== null || S.wait) { this.spec = null; this.emitSpec(null); } return 'me'; }
+    const mates = ps.filter(p => p.id !== 'me' && p.team === me.team && p.alive);
+    const cur = ps.find(p => p.id === S.id);
+    if (cur?.alive) { S.wait = 0; if (S.next) { S.next = false; const i = mates.indexOf(cur); if (mates.length > 1) { S.id = mates[(i + 1) % mates.length].id; this.emitSpec(S.id); } } return S.id; }
+    S.next = false;
+    if (!S.wait) S.wait = now + 1000; // 1 s pause ved død (egen eller den fulgtes)
+    if (now < S.wait || !mates.length) return S.id || 'none';
+    const from = cur || me; mates.sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y));
+    S.id = mates[0].id; S.wait = 0; this.emitSpec(S.id); return S.id;
+  }
+  emitSpec(id) {
+    const ps = this.cur?.players || [], p = ps.find(q => q.id === id), me = ps.find(q => q.id === 'me');
+    const count = me ? ps.filter(q => q.id !== 'me' && q.team === me.team && q.alive).length : 0;
+    globalThis.__spectate = p ? { id, cls: p.cls, name: p.name || p.cls, count } : null;
+    globalThis.dispatchEvent(new CustomEvent('hexarena:spectate', { detail: globalThis.__spectate || { id: null } }));
+  }
   draw(alpha) {
     const g = this.g, now = this.time.now; g.clear(); this.fxG.clear();
     const lerp = (a, b) => a + (b - a) * alpha;
+    const specId = this.updateSpectate(now);
     for (const p of this.cur.players) {
       const pp = this.prev.players.find(q => q.id === p.id) || p; if (!p.alive) continue;
       const x = lerp(pp.x, p.x), y = lerp(pp.y, p.y), col = p.team === 'blue' ? PALETTE.blue : PALETTE.red, glow = p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, r = p.radius ?? TILE_PX * 0.4;
-      if (p.id === 'me') { const la = this.input_.aimPreview(), ll = la ? Math.hypot(la.x, la.y) || 1 : 1; this.camTarget.setPosition(x + (la ? la.x / ll * CAMERA.aimLeadTiles * TILE_PX : 0), y + (la ? la.y / ll * CAMERA.aimLeadTiles * TILE_PX : 0)); g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5); }
+      if (specId !== 'me' && p.id === specId) this.camTarget.setPosition(x, y);
+      if (p.id === 'me' && specId === 'me') { const la = this.input_.aimPreview(), ll = la ? Math.hypot(la.x, la.y) || 1 : 1; this.camTarget.setPosition(x + (la ? la.x / ll * CAMERA.aimLeadTiles * TILE_PX : 0), y + (la ? la.y / ll * CAMERA.aimLeadTiles * TILE_PX : 0)); g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5); }
+      if (p.id === 'me' && specId !== 'me') g.lineStyle(2, 0xffffff, 0.8).strokeCircle(x, y, r + 5);
       drawUnit(g, classes[p.cls]?.shape, x, y, r, (p.facing ?? Math.atan2(p.aim?.y || 0, p.aim?.x || 1)), col, glow);
       if (p.spawnShieldLeft > 0) g.lineStyle(2, glow, FX.spawnShield.alpha + 0.3 * Math.sin(now / FX.spawnShield.pulseMs * 6.28)).strokeCircle(x, y, r + 9);
       { const z = this.cameras.main.zoom, bw = 36 / z, bh = 4 / z, by = y - r - 10 / z - bh; g.fillStyle(0x000000, 0.6).fillRect(x - bw / 2, by, bw, bh).fillStyle(col).fillRect(x - bw / 2, by, bw * p.hp / p.maxHp, bh); } // HP-bar i fast skærmstørrelse (36×4 px) uanset zoom
