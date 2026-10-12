@@ -283,6 +283,8 @@ export function createAI(w, cfg, seed = 1) {
     }
     f.move = smoothMove(b, f.move);
     if (!t && b.state !== 'engage' && Math.hypot(f.move.x, f.move.y) > 0.2 && !b.target && !(b.state === 'hold' && b.mem)) f.aim = norm(f.move);
+    // Når botten bare går (ikke kæmper eller skyder), sendes intet sigte, så figuren vender i gåretningen ligesom en spiller
+    if (!f.fire && b.state !== 'engage' && Math.hypot(f.move.x, f.move.y) > 0.2) f.aim = null;
     if (p.abilityCooldownLeft === 0) useAbility(b, p, f, t); // efter udglatning, så dash går præcis i den ønskede retning
     b.prevT = t ? { id: t.id, x: t.x, y: t.y } : null;
     b.move = f.move; b.aim = f.aim;
