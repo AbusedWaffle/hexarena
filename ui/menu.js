@@ -1,7 +1,7 @@
-// Startmenu, klassevalg, sværhedsgrad og holdstørrelse. Indgangspunkt fra index.html.
+// Startmenu: forside + deltag med kode. Klasse og indstillinger vælges i lobbyen. Indgangspunkt fra index.html.
 // Menuen omsætter valget { mode, cls, difficulty, aiSlots } til de URL-parametre, game.js allerede læser,
 // og starter så spillet uden genindlæsning. Har URL'en allerede spil-parametre, springes menuen over.
-const GAME_KEYS = ['cls', 'diff', 'red', 'blue', 'host', 'room', 'net', 'aidebug'];
+const GAME_KEYS = ['cls', 'diff', 'red', 'blue', 'host', 'room', 'net', 'aidebug', 'lobby'];
 const STORE = 'hexarena.menu.v1';
 const qs = new URLSearchParams(location.search);
 
@@ -22,44 +22,29 @@ async function showMenu() {
       <button class="ha-btn primary" data-go="single">Spil mod robotter</button>
       <button class="ha-btn" data-go="host">Opret spil</button>
       <button class="ha-btn" data-go="join">Deltag med kode</button>
-      ${saved.cls ? `<div class="hm-sub">Sidst: ${name(saved.cls)}, ${diffName(saved.difficulty)}, ${saved.teamSize} mod ${saved.teamSize}</div>` : ''}
+      ${saved.cls ? `<div class="hm-sub">Sidst: ${name(saved.cls)}, ${diffName(saved.lobbySettings?.botDifficulty || saved.difficulty)}, ${saved.lobbySettings?.teamSize || saved.teamSize} mod ${saved.lobbySettings?.teamSize || saved.teamSize}</div>` : ''}
     </div>`, { single, host, join });
 
+  // Klasse, holdstørrelse, robotter og sværhedsgrad vælges nu i lobbyen (ui/lobby.js) – menuen går direkte dertil.
+  const ls = () => ({ teamSize: 3, bots: true, botCount: 'fill', botDifficulty: st.difficulty || 'normal', ...(saved.lobbySettings || {}) });
   function single() {
-    screen(`<button class="ha-btn hm-back" data-go="home">‹ Tilbage</button>
-      <div class="hm-label">Vælg klasse</div>${classCards()}<div class="hm-detail"></div>
-      <div class="hm-label">Sværhedsgrad</div>
-      <div class="ha-seg" data-seg="difficulty">${M.difficulties.map(d => `<button class="ha-btn" data-v="${d.id}">${d.name}</button>`).join('')}</div>
-      <div class="hm-sub" data-diffdesc></div>
-      <div class="hm-label">Holdstørrelse</div>
-      <div class="ha-seg" data-seg="teamSize">${M.teamSizes.map(n => `<button class="ha-btn" data-v="${n}">${n} mod ${n}</button>`).join('')}</div>
-      <button class="ha-btn primary" data-start>Start</button>`, { home });
-    wireClasses(); wireSeg();
-    root.querySelector('[data-start]').onclick = () => { save(); launch({ mode: 'single', cls: st.cls, difficulty: st.difficulty, aiSlots: { blue: st.teamSize - 1, red: st.teamSize } }); };
+    const s = ls(), t = Math.min(4, s.teamSize), n = !s.bots ? 0 : s.botCount === 'fill' ? 2 * t - 1 : s.botCount;
+    const red = Math.min(t, Math.ceil(n / 2)), blue = Math.min(t - 1, n - Math.min(t, Math.ceil(n / 2)));
+    launch({ mode: 'single', cls: st.cls, difficulty: s.botDifficulty, aiSlots: { blue, red } });
   }
-  function host() {
-    screen(`<button class="ha-btn hm-back" data-go="home">‹ Tilbage</button>
-      <div class="hm-label">Vælg klasse</div>${classCards()}<div class="hm-detail"></div>
-      <div class="hm-label">Robotter på ledige pladser</div>
-      <div class="ha-seg" data-seg="difficulty">${M.difficulties.map(d => `<button class="ha-btn" data-v="${d.id}">${d.name}</button>`).join('')}</div>
-      <div class="hm-sub">Du får en kode og en QR-kode, som de andre kan bruge. Ledige pladser fyldes med robotter.</div>
-      <button class="ha-btn primary" data-start>Opret spil</button>`, { home });
-    wireClasses(); wireSeg();
-    root.querySelector('[data-start]').onclick = () => { save(); launch({ mode: 'host', cls: st.cls, difficulty: st.difficulty }); };
-  }
+  function host() { launch({ mode: 'host', cls: st.cls, difficulty: ls().botDifficulty }); }
   function join() {
     screen(`<button class="ha-btn hm-back" data-go="home">‹ Tilbage</button>
       <div class="hm-label">Spilkode</div>
       <input class="hm-code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="•••••">
       <div class="hm-err"></div>
-      <div class="hm-label">Vælg klasse</div>${classCards()}<div class="hm-detail"></div>
-      <button class="ha-btn primary" data-start>Deltag</button>`, { home });
-    wireClasses();
+      <button class="ha-btn primary" data-start>Deltag</button>
+      <div class="hm-sub">Du vælger klasse i lobbyen, mens du venter på host.</div>`, { home });
     const inp = root.querySelector('.hm-code'), err = root.querySelector('.hm-err');
     inp.oninput = () => { inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); err.textContent = ''; };
     root.querySelector('[data-start]').onclick = () => {
       if (inp.value.length !== 5) { err.textContent = 'Koden er på 5 tegn.'; return; }
-      save(); launch({ mode: 'join', code: inp.value, cls: st.cls });
+      launch({ mode: 'join', code: inp.value, cls: st.cls });
     };
   }
 
@@ -99,7 +84,7 @@ async function showMenu() {
   function launch(choice) {
     const p = new URLSearchParams();
     p.set('cls', choice.cls);
-    if (choice.mode === 'single') { p.set('diff', choice.difficulty); p.set('blue', choice.aiSlots.blue); p.set('red', choice.aiSlots.red); }
+    if (choice.mode === 'single') { p.set('lobby', '1'); p.set('diff', choice.difficulty); p.set('blue', choice.aiSlots.blue); p.set('red', choice.aiSlots.red); }
     if (choice.mode === 'host') { p.set('host', '1'); p.set('diff', choice.difficulty); }
     if (choice.mode === 'join') p.set('room', choice.code);
     history.replaceState(null, '', location.pathname + '?' + p);
@@ -111,7 +96,8 @@ async function showMenu() {
 // Spillet læser URL'en ved indlæsning. fromMenu = startet fra menuen (så "Menu" kan komme tilbage uden parametre).
 async function startGame(fromMenu = false) {
   // lobby-overlay skal lytte før spillet melder kode/holdliste
-  if (new URLSearchParams(location.search).has('host')) await import('./lobby.js');
+  // Alle kampe går gennem lobbyen (lokal, host og klient); ?lobby=0 springer den over (tests/debug).
+  if (new URLSearchParams(location.search).get('lobby') !== '0') await import('./lobby.js');
   import('../render/game.js');
   addCss('art/menu.css'); addCss('ui/menu.css');
   const toMenu = () => { location.href = location.pathname; };

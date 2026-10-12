@@ -1,6 +1,8 @@
 // Lobby-overlay for host i Modern Warfare 2-pregame-layout (HexArena-stil): menu + kort/kode/QR til venstre,
 // holdliste som scoreboard til højre, ticker i bunden.
-// Lytter på 'hexarena:lobby' fra render/game.js: detail = {code, status?, error?, roster?}; roster = [{id, team, cls, human, name}].
+// Bruges til alle kampe: lokal (mod robotter), host og klient. Menu: START (ikke klient), KLASSE, INDSTILLINGER, VIS KODE/DEL LINK (host), MENU.
+// Sender: hexarena:lobby-start {code,mode,cls,settings}, hexarena:lobby-class {cls}, hexarena:lobby-settings {settings}.
+// Lytter på 'hexarena:lobby': {code?, status?, error?, roster?, mode?, settings?, isHost?, started?}; roster = [{id, team, cls, human, name}].
 import qrcode from '../vendor/qrcode.mjs';
 
 const CSS = `
@@ -9,7 +11,8 @@ const CSS = `
  padding:max(10px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));box-sizing:border-box;overflow:hidden}
 .hl-wrap[hidden]{display:none}
 .hl-l,.hl-r{display:flex;flex-direction:column;min-height:0;min-width:0;gap:clamp(4px,1.4vh,10px)}
-.hl-title{font-size:clamp(18px,5.5vh,34px);font-weight:700;letter-spacing:.3em;line-height:1.1}
+.hl-title{font-size:clamp(15px,4.6vh,30px);font-weight:700;letter-spacing:.18em;line-height:1.1;}
+.hl-title small{font-size:.5em;letter-spacing:.14em;opacity:.8;white-space:nowrap}
 .hl-sub{font-size:clamp(10px,2.6vh,13px);opacity:.6;letter-spacing:.15em;text-transform:uppercase}
 .hl-menu{display:flex;flex-direction:column}
 .hl-mi{all:unset;cursor:pointer;font-size:clamp(13px,4vh,20px);letter-spacing:.12em;padding:clamp(2px,.9vh,6px) 12px;border-left:3px solid transparent;opacity:.75}
@@ -45,16 +48,67 @@ const CSS = `
 .hl-mbox .hl-code{font-size:clamp(36px,13vh,72px)}
 .hl-mbox .ha-btn{min-height:40px}
 .hl-chip{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;font:600 13px 'Roboto Mono',monospace;padding:6px 10px;border-radius:8px;background:rgba(6,9,26,.8);color:#E6ECFF;border:1px solid #4FA3FF;cursor:pointer}
+.hl-mbox.wide{flex-direction:column;align-items:stretch;width:min(92vw,820px);gap:clamp(6px,1.6vh,12px)}
+.hl-mhead{display:flex;justify-content:space-between;align-items:center;font-size:clamp(13px,4vh,18px);letter-spacing:.2em}
+.hl-mhead .ha-btn{min-height:32px;min-width:0;padding:0 16px;font-size:14px}
+.hl-cards{display:flex;gap:8px;justify-content:center}
+.hl-cards .ha-card{flex:1;min-width:0;width:auto;padding:6px;cursor:pointer}
+.hl-cards .ha-card img{width:clamp(28px,10vh,64px);height:clamp(28px,10vh,64px)}
+.hl-cards .ha-card .name{font-size:clamp(12px,3.6vh,16px)}.hl-cards .ha-card .role{font-size:11px;margin-bottom:2px}
+.hl-cards .ha-stat span:first-child{width:auto!important;flex:none;min-width:5.5em}
+.hl-cards.ro .ha-card{cursor:default}
+.hl-det{font-size:clamp(11px,3vh,13px);opacity:.85;min-height:2.4em}.hl-det b{color:var(--ha-score,#FFD75A)}
+.hl-set{display:grid;grid-template-columns:1fr 1fr;gap:clamp(4px,1.6vh,12px) 20px}
+.hl-set label{display:flex;flex-direction:column;gap:3px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.9}
+.hl-set .ha-seg .ha-btn{min-height:clamp(30px,8.5vh,42px);font-size:clamp(12px,3.4vh,15px);padding:0 4px;min-width:0}
+.hl-set .ha-seg .ha-btn.primary{box-shadow:0 0 10px rgba(111,160,255,.45)}
+.hl-set.ro .ha-seg .ha-btn{pointer-events:none}.hl-set.ro .ha-seg .ha-btn:not(.primary){opacity:.45}
+.hl-set .ha-seg .ha-btn:disabled{opacity:.3}
+.hl-wait{font-size:clamp(13px,4vh,20px);letter-spacing:.12em;padding:clamp(2px,.9vh,6px) 12px;border-left:3px solid #FFD75A;color:#FFE9A8}
 `;
 
-const MODES = { tdm: 'HOLDKAMP', team: 'HOLDKAMP', knockout: 'KNOCKOUT', ffa: 'ALLE MOD ALLE' };
+const MODES = { tdm: 'HOLDKAMP', team: 'HOLDKAMP', knockout: 'HOLDKAMP', ffa: 'ALLE MOD ALLE' };
 const qs = new URLSearchParams(location.search);
-const title = MODES[(qs.get('mode') || '').toLowerCase()] || 'HOLDKAMP';
 const ICONS = ['assault', 'sniper', 'engineer', 'scout', 'support'];
+const STORE = 'hexarena.menu.v1';
+const DIFF = { easy: 'LET', normal: 'NORMAL', hard: 'SVÆR' };
+// Standard-indstillinger; data/menu.json `lobbySettings` (defaults/options) overskriver hvis den findes.
+let OPT = { teamSize: [1, 2, 3, 4], bots: [true, false], botDifficulty: ['easy', 'normal', 'hard'], roundsToWin: [2, 3, 5], roundTimeSec: [45, 60, 75, 90] };
+let DEF = { teamSize: 3, bots: true, botCount: 'fill', botDifficulty: 'normal', roundsToWin: 3, roundTimeSec: 75 };
 
-let started = false, showCode = false, code = null, roster = [], status = 'connecting', error = '', open = true, map = null;
+const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || '{}'); } catch { return {}; } };
+const persist = (patch) => { const o = { ...load(), ...patch }; localStorage.setItem(STORE, JSON.stringify(o)); };
+let saved = load();
+let mode = qs.has('host') ? 'host' : qs.has('room') ? 'client' : 'local';
+let cls = qs.get('cls') || saved.cls || 'Assault';
+let settings = normalize({ ...DEF, ...(saved.lobbySettings || {}), ...(saved.difficulty && !saved.lobbySettings ? { botDifficulty: saved.difficulty } : {}), ...(saved.teamSize && !saved.lobbySettings ? { teamSize: Math.min(4, saved.teamSize) } : {}) });
+let started = false, panel = null, code = mode === 'client' ? qs.get('room') : null, roster = null, status = mode === 'local' ? 'open' : 'connecting', error = '', open = true, map = null, M = null;
+let active = mode !== 'local' || qs.get('lobby') === '1'; // lokalt spil viser kun lobbyen med ?lobby=1 (som game.js venter på)
+// Udadtil er botCount altid et tal (antal robotter i alt); 'Fyld' sendes som 2·teamSize−1 + botFill:true.
+const pub = (x) => ({ ...x, botCount: x.botCount === 'fill' ? 2 * x.teamSize - 1 : x.botCount, botFill: x.botCount === 'fill' });
+globalThis.__lobbySettings = pub(settings);
+
+function normalize(x) {
+  const t = Number(x.teamSize) || 3, max = 2 * t - 1;
+  const bc = x.botCount === 'fill' || x.botCount == null ? 'fill' : Math.max(0, Math.min(max, Number(x.botCount)));
+  return { teamSize: t, bots: x.bots !== false, botCount: bc, botDifficulty: x.botDifficulty || 'normal', roundsToWin: Number(x.roundsToWin) || 3, roundTimeSec: Number(x.roundTimeSec) || 75 };
+}
+const emit = (name, detail) => globalThis.dispatchEvent(new CustomEvent(name, { detail }));
+const editable = () => mode !== 'client' && !started;
+
 fetch(new URL('../data/map_paintyard_sq_01.json', import.meta.url)).then(r => r.json()).then(m => { map = m; render(); }).catch(() => {});
+fetch(new URL('../data/menu.json', import.meta.url)).then(r => r.json()).then(m => {
+  M = m; const L = m.lobbySettings;
+  if (L) {
+    for (const k of Object.keys(OPT)) { const v = L[k]; if (v?.options) OPT[k] = v.options; if (v && 'default' in v) DEF[k] = v.default; }
+    if (L.defaults) Object.assign(DEF, L.defaults); if (L.options) Object.assign(OPT, L.options);
+    if (!saved.lobbySettings && mode !== 'client') { settings = normalize({ ...DEF, ...(saved.difficulty ? { botDifficulty: saved.difficulty } : {}) }); globalThis.__lobbySettings = pub(settings); }
+  }
+  render();
+}).catch(() => {});
+
 const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; };
+if (!document.querySelector('link[href="art/menu.css"]')) { const l = el('link'); l.rel = 'stylesheet'; l.href = 'art/menu.css'; document.head.append(l); }
 const st = el('style'); st.textContent = CSS; document.head.append(st);
 const wrap = el('div', 'hl-wrap'); wrap.id = 'lobby';
 const chip = el('button', 'hl-chip'); chip.id = 'lobby-chip'; chip.hidden = true;
@@ -72,76 +126,176 @@ function drawMap() {
   return c;
 }
 
+const iconUrl = (c, team) => { const k = String(c || '').toLowerCase(); return new URL(`../art/icons/${ICONS.includes(k) ? k : 'assault'}_${team === 'red' ? 'red' : 'blue'}.svg`, import.meta.url).href; };
 function rowEl(r) {
   const d = el('div', 'hl-p ' + r.team + (r.human ? ' human' : ' bot'));
-  const k = String(r.cls || '').toLowerCase();
-  const img = el('img'); img.alt = ''; img.src = new URL(`../art/icons/${ICONS.includes(k) ? k : 'assault'}_${r.team === 'red' ? 'red' : 'blue'}.svg`, import.meta.url).href;
+  const img = el('img'); img.alt = ''; img.src = iconUrl(r.cls, r.team);
   const name = r.human ? (r.id === 'me' ? 'Dig' : (r.name || 'Spiller')) : 'Robot · ' + (r.cls || '');
   d.append(img, el('span', '', name), el('span', 't', r.team === 'red' ? 'RØD' : 'BLÅ'));
   return d;
 }
 
+// Forhåndsvisning af holdene ud fra indstillingerne (når spillet ikke har sendt en roster)
+// Mennesker tages fra spillets roster (hvis sendt), ledige pladser fyldes med robotter efter indstillingerne.
+function previewRoster() {
+  const t = settings.teamSize, order = ['Assault', 'Sniper', 'Engineer', 'Scout', 'Support'];
+  const out = (roster || []).filter(x => x.human);
+  if (!out.some(x => x.id === 'me') && mode !== 'client') out.unshift({ id: 'me', team: 'blue', cls, human: true, name: 'Dig' });
+  if (mode === 'client' && !out.length) out.push({ id: 'me', team: 'blue', cls, human: true, name: 'Dig' });
+  let b = out.filter(x => x.team !== 'red').length, r = out.length - b;
+  const n = Math.min(2 * t - out.length, !settings.bots ? 0 : settings.botCount === 'fill' ? 2 * t - 1 : settings.botCount);
+  for (let i = 0; i < n; i++) {
+    if (r < t && (r < b || b >= t)) out.push({ id: 'botR' + r, team: 'red', cls: order[r % 5], human: false }), r++;
+    else out.push({ id: 'botB' + b, team: 'blue', cls: order[b % 5], human: false }), b++;
+  }
+  return out;
+}
+
+function setSettings(patch) {
+  settings = normalize({ ...settings, ...patch });
+  const out = pub(settings); globalThis.__lobbySettings = out;
+  persist({ lobbySettings: settings, difficulty: settings.botDifficulty, teamSize: settings.teamSize });
+  emit('hexarena:lobby-settings', { settings: out });
+  render();
+}
+function setClass(c) {
+  cls = c; persist({ cls: c });
+  if (roster) roster = roster.map(r => r.id === 'me' ? { ...r, cls: c } : r);
+  emit('hexarena:lobby-class', { cls: c });
+  render();
+}
+
 function render() {
-  if (!code) return;
+  if (!active || (mode !== 'local' && !code)) return;
+  if (!document.body) return void addEventListener('DOMContentLoaded', render, { once: true });
   if (!wrap.isConnected) document.body.append(wrap, chip);
-  wrap.hidden = !open; chip.hidden = open; chip.textContent = 'Kode ' + code;
+  wrap.hidden = !open; chip.hidden = open; chip.textContent = code ? 'Kode ' + code : '≡ Lobby';
   if (!open) return;
   wrap.replaceChildren();
   const L = el('div', 'hl-l'), R = el('div', 'hl-r');
-  const menu = el('div', 'hl-menu');
-  const start = el('button', 'hl-mi sel ha-btn primary', started ? 'TILBAGE TIL KAMPEN' : 'START KAMPEN'); start.id = 'lobby-start';
-  start.onclick = () => {
-    open = false; showCode = false;
-    // første tryk starter kampen: game.js holder simulering/rundeur stille indtil dette event (sendes kun én gang)
-    if (!started) { started = true; globalThis.__lobbyStarted = true; globalThis.dispatchEvent(new CustomEvent('hexarena:lobby-start', { detail: { code } })); }
-    render();
-  };
-  const mkShare = (cls) => { const b = el('button', cls, navigator.share ? 'DEL LINK' : 'KOPIÉR LINK');
+  const menu = el('div', 'hl-menu'), items = [];
+  const mi = (txt, id, fn, extra = '') => { const b = el('button', 'hl-mi ha-btn' + extra, txt); if (id) b.id = id; b.onclick = fn; items.push(b); return b; };
+  if (mode !== 'client') {
+    mi(started ? 'TILBAGE TIL KAMPEN' : 'START KAMPEN', 'lobby-start', () => {
+      open = false; panel = null;
+      // første tryk starter kampen: game.js holder simulering/rundeur stille indtil dette event (sendes kun én gang)
+      if (!started) { started = true; globalThis.__lobbyStarted = true; emit('hexarena:lobby-start', { code, mode, cls, settings: pub(settings) }); }
+      render();
+    }, ' sel primary');
+  } else {
+    if (started) mi('TILBAGE TIL KAMPEN', 'lobby-start', () => { open = false; panel = null; render(); }, ' sel primary');
+    else { const w = el('div', 'hl-wait', 'Venter på host…'); w.id = 'lobby-wait'; menu.append(w); }
+  }
+  mi('KLASSE', 'lobby-class', () => { panel = 'class'; render(); });
+  mi('INDSTILLINGER', 'lobby-settings', () => { panel = 'settings'; render(); });
+  const mkShare = (c) => { const b = el('button', c, navigator.share ? 'DEL LINK' : 'KOPIÉR LINK');
     b.onclick = async () => {
       try { if (navigator.share) await navigator.share({ title: 'HexArena', text: 'Spil med! Kode ' + code, url: link() }); else { await navigator.clipboard.writeText(link()); b.textContent = 'KOPIERET ✓'; } }
       catch { try { await navigator.clipboard.writeText(link()); b.textContent = 'KOPIERET ✓'; } catch {} }
     }; return b; };
-  const share = mkShare('hl-mi ha-btn'); share.id = 'lobby-share';
-  const show = el('button', 'hl-mi ha-btn', 'VIS KODE'); show.id = 'lobby-show-code';
-  show.onclick = () => { showCode = true; render(); };
-  const back = el('button', 'hl-mi ha-btn', 'MENU'); back.onclick = () => { location.href = location.pathname; };
-  for (const b of [start, show, share, back]) b.onmouseenter = () => menu.querySelectorAll('.hl-mi').forEach(x => x.classList.toggle('sel', x === b));
-  menu.append(start, show, share, back);
+  if (mode === 'host') {
+    mi('VIS KODE', 'lobby-show-code', () => { panel = 'code'; render(); });
+    const sh = mkShare('hl-mi ha-btn'); sh.id = 'lobby-share'; items.push(sh);
+  }
+  mi('MENU', null, () => { location.href = location.pathname; });
+  for (const b of items) b.onmouseenter = () => items.forEach(x => x.classList.toggle('sel', x === b));
+  menu.append(...items);
 
   const card = el('div', 'hl-card');
-  const mp = el('div', 'hl-map'); mp.append(drawMap(), el('div', 'hl-mapcode', 'KODE ' + code), el('div', 'hl-mapname', map?.name || 'Paintyard'));
-  const q = qrcode(0, 'M'); q.addData(link()); q.make();
-  const qr = el('div', 'hl-qr'); qr.id = 'lobby-qr'; qr.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
-  const codeEl = el('div', 'hl-code', code); codeEl.id = 'lobby-code';
+  const mp = el('div', 'hl-map'); mp.append(drawMap(), el('div', 'hl-mapname', map?.name || 'Paintyard'));
+  if (code) mp.append(el('div', 'hl-mapcode', 'KODE ' + code));
   card.append(mp);
   const s = el('div', 'hl-status' + (status === 'error' ? ' err' : ''),
-    status === 'error' ? 'Netværksfejl: ' + error : status === 'open' ? 'Klar – venner kan nu deltage med koden' : 'Opretter spil…');
+    status === 'error' ? 'Netværksfejl: ' + error : mode === 'local' ? 'Kamp mod robotter · ' + DIFF[settings.botDifficulty] : mode === 'client' ? (status === 'open' ? 'Forbundet – venter på at host starter' : 'Forbinder til ' + code + '…') : status === 'open' ? 'Klar – venner kan nu deltage med koden' : 'Opretter spil…');
   s.id = 'lobby-status';
-  L.append(el('div', 'hl-title', title), menu, card, s);
+  const t = settings.teamSize;
+  const tt = el('div', 'hl-title', MODES[(qs.get('mode') || '').toLowerCase()] || 'HOLDKAMP'); tt.id = 'lobby-title';
+  tt.append(el('small', '', ` · ${t} MOD ${t} · FØRST TIL ${settings.roundsToWin}`));
+  L.append(tt, menu, card, s);
 
-  const humans = roster.filter(r => r.human).length;
-  const head = el('div', 'hl-head'); head.append(el('span', '', 'Venter på spillere'), el('span', 'hl-sub', 'Lobby'));
+  const list = previewRoster();
+  const humans = list.filter(r => r.human).length;
+  const head = el('div', 'hl-head'); head.append(el('span', '', mode === 'local' ? 'Holdene' : 'Venter på spillere'), el('span', 'hl-sub', mode === 'local' ? 'Mod robotter' : 'Lobby'));
   const rl = el('div', 'hl-roster'); rl.id = 'lobby-roster';
-  const blue = roster.filter(r => r.team !== 'red'), red = roster.filter(r => r.team === 'red');
+  const blue = list.filter(r => r.team !== 'red'), red = list.filter(r => r.team === 'red');
   blue.forEach(r => rl.append(rowEl(r))); if (blue.length && red.length) rl.append(el('div', 'hl-gap')); red.forEach(r => rl.append(rowEl(r)));
-  R.append(head, rl, el('div', 'hl-count', `${humans}/${roster.length || humans} SPILLERE`));
+  R.append(head, rl, el('div', 'hl-count', `${humans}/${2 * t} SPILLERE`));
 
-  const tick = el('div', 'hl-tick', `Del koden ${code} med dine venner – de kan scanne QR-koden eller åbne linket`);
+  const tick = el('div', 'hl-tick', mode === 'host' ? `Del koden ${code} med dine venner – de kan scanne QR-koden eller åbne linket`
+    : mode === 'client' ? `Du er med i spil ${code} – vælg klasse, mens du venter på at host starter kampen`
+    : `${t} mod ${t} · robotter: ${DIFF[settings.botDifficulty]} · først til ${settings.roundsToWin} runder · ${settings.roundTimeSec} s pr. runde`);
   wrap.append(L, R, tick);
-  if (showCode) {
-    const m = el('div', 'hl-modal'), box = el('div', 'hl-mbox'), col = el('div', 'hl-mcol');
-    const close = el('button', 'ha-btn primary', 'LUK'); close.id = 'lobby-code-close';
-    close.onclick = () => { showCode = false; render(); };
-    m.onclick = (e) => { if (e.target === m) close.onclick(); };
-    col.append(el('div', 'hl-sub', 'Spilkode'), codeEl, mkShare('ha-btn'), close);
-    box.append(qr, col); m.append(box); wrap.append(m);
-  }
+  if (panel) wrap.append(modal());
 }
 
+function modal() {
+  const m = el('div', 'hl-modal'), close = el('button', 'ha-btn primary', 'LUK');
+  close.id = panel === 'code' ? 'lobby-code-close' : 'lobby-panel-close';
+  close.onclick = () => { panel = null; render(); };
+  m.onclick = (e) => { if (e.target === m) close.onclick(); };
+  if (panel === 'code') {
+    const box = el('div', 'hl-mbox'), col = el('div', 'hl-mcol');
+    const q = qrcode(0, 'M'); q.addData(link()); q.make();
+    const qr = el('div', 'hl-qr'); qr.id = 'lobby-qr'; qr.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    const codeEl = el('div', 'hl-code', code); codeEl.id = 'lobby-code';
+    const sh = el('button', 'ha-btn', navigator.share ? 'DEL LINK' : 'KOPIÉR LINK');
+    sh.onclick = () => document.getElementById('lobby-share')?.click();
+    col.append(el('div', 'hl-sub', 'Spilkode'), codeEl, sh, close);
+    box.append(qr, col); m.append(box); return m;
+  }
+  const box = el('div', 'hl-mbox wide'); box.id = panel === 'class' ? 'lobby-class-panel' : 'lobby-settings-panel';
+  const head = el('div', 'hl-mhead');
+  head.append(el('span', '', panel === 'class' ? 'VÆLG KLASSE' : 'INDSTILLINGER' + (editable() ? '' : ' · KUN HOST')), close);
+  box.append(head);
+  if (panel === 'class') {
+    const classes = M?.classes || ICONS.map(i => ({ id: i[0].toUpperCase() + i.slice(1), name: i[0].toUpperCase() + i.slice(1), role: '', stats: {} }));
+    const cards = el('div', 'hl-cards' + (started ? ' ro' : '')), det = el('div', 'hl-det');
+    for (const c of classes) {
+      const d = el('div', 'ha-card' + (c.id === cls ? ' selected' : '')); d.dataset.cls = c.id;
+      d.innerHTML = `<img src="${iconUrl(c.id, 'blue')}" alt=""><div class="name">${c.name}</div><div class="role">${c.role || ''}</div>` +
+        Object.entries(c.stats || {}).map(([k, v]) => `<div class="ha-stat"><span>${k}</span><span class="bar">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= v ? 'on' : ''}"></i>`).join('')}</span></div>`).join('');
+      if (!started) d.onclick = () => setClass(c.id);
+      cards.append(d);
+    }
+    const c = classes.find(x => x.id === cls) || classes[0];
+    if (c?.desc) det.innerHTML = `${c.desc} <b>${c.weapon}</b> · <b>${c.ability.name}</b>: ${c.ability.desc}`;
+    box.append(cards, det);
+  } else {
+    const ed = editable(), grid = el('div', 'hl-set' + (ed ? '' : ' ro')), max = 2 * settings.teamSize - 1;
+    const seg = (label, key, opts) => {
+      const lb = el('label'); lb.append(label); const sg = el('div', 'ha-seg'); sg.dataset.k = key;
+      for (const [v, txt, dis] of opts) {
+        const b = el('button', 'ha-btn' + (String(settings[key]) === String(v) ? ' primary' : ''), txt); b.dataset.v = String(v);
+        if (dis) b.disabled = true;
+        b.onclick = () => { if (!editable()) return; if (key === 'botCount' && (v === '-' || v === '+')) { const cur = settings.botCount === 'fill' ? max : settings.botCount; return setSettings({ botCount: Math.max(0, Math.min(max, cur + (v === '+' ? 1 : -1))) }); } setSettings({ [key]: v }); };
+        sg.append(b);
+      }
+      lb.append(sg); grid.append(lb);
+    };
+    seg('Holdstørrelse', 'teamSize', OPT.teamSize.map(n => [n, `${n} mod ${n}`]));
+    seg('Robotter', 'bots', [[true, 'Til'], [false, 'Fra']]);
+    const off = !settings.bots, nNow = settings.botCount === 'fill' ? max : settings.botCount;
+    seg(`Antal robotter (0–${max})`, 'botCount', [['fill', 'Fyld', off], ['-', '−', off || nNow <= 0], [nNow, String(nNow), off], ['+', '+', off || nNow >= max]]);
+    seg('Robotternes niveau', 'botDifficulty', OPT.botDifficulty.map(d => [d, M?.difficulties?.find(x => x.id === d)?.name || d]));
+    seg('Først til (runder)', 'roundsToWin', OPT.roundsToWin.map(n => [n, String(n)]));
+    seg('Rundetid', 'roundTimeSec', OPT.roundTimeSec.map(n => [n, n + ' s']));
+    // tælleren viser værdi uden at være "valgt" som en knap
+    grid.querySelector('[data-k=botCount] [data-v="' + nNow + '"]')?.classList.toggle('primary', settings.botCount !== 'fill' && !off);
+    box.append(grid);
+  }
+  m.append(box); return m;
+}
+
+// Fra render/game.js: detail = {code?, status?, error?, roster?, mode?, settings?, isHost?, started?}
 globalThis.addEventListener('hexarena:lobby', (e) => {
   const d = e.detail || {};
+  active = true;
+  if (d.mode) mode = d.mode; else if (d.isHost === true) mode = 'host'; else if (d.isHost === false) mode = 'client';
   if (d.code) code = d.code;
   if (d.roster) roster = d.roster;
+  if (d.settings && mode === 'client') { settings = normalize(d.settings.botFill ? { ...d.settings, botCount: 'fill' } : d.settings); globalThis.__lobbySettings = pub(settings); }
+  if (d.started && !started) { started = true; if (mode === 'client') { open = false; panel = null; } }
   if (d.status) { status = d.status; error = d.error || ''; if (status === 'error') open = true; }
   render();
 });
+render();
