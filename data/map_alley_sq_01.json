@@ -1,0 +1,411 @@
+{
+ "id": "alley_sq_01",
+ "name": "Gyden",
+ "grid": "square",
+ "width": 16,
+ "height": 10,
+ "size": "small",
+ "_note": "Kun v\u00e6gge og kasser er listet; alt andet er floor. Kasse-HP kommer fra _match.crateHp.",
+ "rows": [
+  "################",
+  "#R......x......#",
+  "#R.xx......##..#",
+  "#.R....x...x...#",
+  "#R..##.....x...#",
+  "#...x.....##..B#",
+  "#...x...x....B.#",
+  "#..##......xx.B#",
+  "#......x......B#",
+  "################"
+ ],
+ "tiles": [
+  {
+   "x": 0,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 1,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 2,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 3,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 4,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 5,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 6,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 7,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 8,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 9,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 10,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 11,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 12,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 13,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 14,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 15,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 1,
+   "type": "wall"
+  },
+  {
+   "x": 8,
+   "y": 1,
+   "type": "crate"
+  },
+  {
+   "x": 15,
+   "y": 1,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 2,
+   "type": "wall"
+  },
+  {
+   "x": 3,
+   "y": 2,
+   "type": "crate"
+  },
+  {
+   "x": 4,
+   "y": 2,
+   "type": "crate"
+  },
+  {
+   "x": 11,
+   "y": 2,
+   "type": "wall"
+  },
+  {
+   "x": 12,
+   "y": 2,
+   "type": "wall"
+  },
+  {
+   "x": 15,
+   "y": 2,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 3,
+   "type": "wall"
+  },
+  {
+   "x": 7,
+   "y": 3,
+   "type": "crate"
+  },
+  {
+   "x": 11,
+   "y": 3,
+   "type": "crate"
+  },
+  {
+   "x": 15,
+   "y": 3,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 4,
+   "type": "wall"
+  },
+  {
+   "x": 4,
+   "y": 4,
+   "type": "wall"
+  },
+  {
+   "x": 5,
+   "y": 4,
+   "type": "wall"
+  },
+  {
+   "x": 11,
+   "y": 4,
+   "type": "crate"
+  },
+  {
+   "x": 15,
+   "y": 4,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 5,
+   "type": "wall"
+  },
+  {
+   "x": 4,
+   "y": 5,
+   "type": "crate"
+  },
+  {
+   "x": 10,
+   "y": 5,
+   "type": "wall"
+  },
+  {
+   "x": 11,
+   "y": 5,
+   "type": "wall"
+  },
+  {
+   "x": 15,
+   "y": 5,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 6,
+   "type": "wall"
+  },
+  {
+   "x": 4,
+   "y": 6,
+   "type": "crate"
+  },
+  {
+   "x": 8,
+   "y": 6,
+   "type": "crate"
+  },
+  {
+   "x": 15,
+   "y": 6,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 7,
+   "type": "wall"
+  },
+  {
+   "x": 3,
+   "y": 7,
+   "type": "wall"
+  },
+  {
+   "x": 4,
+   "y": 7,
+   "type": "wall"
+  },
+  {
+   "x": 11,
+   "y": 7,
+   "type": "crate"
+  },
+  {
+   "x": 12,
+   "y": 7,
+   "type": "crate"
+  },
+  {
+   "x": 15,
+   "y": 7,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 7,
+   "y": 8,
+   "type": "crate"
+  },
+  {
+   "x": 15,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 1,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 2,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 3,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 4,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 5,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 6,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 7,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 8,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 9,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 10,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 11,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 12,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 13,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 14,
+   "y": 9,
+   "type": "wall"
+  },
+  {
+   "x": 15,
+   "y": 9,
+   "type": "wall"
+  }
+ ],
+ "spawns": {
+  "red": [
+   {
+    "x": 1,
+    "y": 1
+   },
+   {
+    "x": 1,
+    "y": 2
+   },
+   {
+    "x": 2,
+    "y": 3
+   },
+   {
+    "x": 1,
+    "y": 4
+   }
+  ],
+  "blue": [
+   {
+    "x": 14,
+    "y": 5
+   },
+   {
+    "x": 13,
+    "y": 6
+   },
+   {
+    "x": 14,
+    "y": 7
+   },
+   {
+    "x": 14,
+    "y": 8
+   }
+  ]
+ },
+ "spawnZones": {
+  "red": {
+   "x0": 1,
+   "x1": 2
+  },
+  "blue": {
+   "x0": 13,
+   "x1": 14
+  }
+ }
+}
