@@ -36,11 +36,21 @@ ok.settings = s.botCount === 3 && s.botFill === true && s.teamSize === 2 && s.bo
 ok.settingsEvent = await pg.evaluate(() => __ev.filter(([n]) => n === 'hexarena:lobby-settings').length === 4);
 ok.title = (await pg.textContent('#lobby-title')).includes('2 MOD 2 · FØRST TIL 5');
 await click(pg, '#lobby-panel-close');
+// BANE
+await pg.tap('#lobby-map'); await pg.waitForTimeout(400);
+ok.mapPanelInView = await inView(pg, '#lobby-map-panel') && await inView(pg, '#lobby-panel-close');
+ok.mapCards = (await pg.$$('#lobby-map-panel [data-map]')).length === 6;
+await pg.screenshot({ path: P + '_maps.png' });
+await click(pg, '#lobby-map-panel [data-map=alley_sq_01]'); await pg.waitForTimeout(400);
+ok.mapPicked = await pg.evaluate(() => __lobbySettings.map === 'alley_sq_01' && !document.querySelector('#lobby-map-panel') && __ev.some(([n, d]) => n === 'hexarena:lobby-settings' && d.settings.map === 'alley_sq_01') && JSON.parse(localStorage.getItem('hexarena.menu.v1')).lobbySettings.map === 'alley_sq_01');
+ok.mapName = (await pg.textContent('#lobby-map-name')).includes('Gyden');
+await pg.screenshot({ path: P + '_main_map.png' });
 // klient
 const cl = await newPage(`?room=${code}&net=bc&cls=Sniper`);
 await cl.evaluate(() => dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { mode: 'client', settings: { teamSize: 2, bots: true, botCount: 'fill', botDifficulty: 'hard', roundsToWin: 5, roundTimeSec: 60 } } })));
 await cl.waitForTimeout(150);
 ok.clientNoStart = !(await cl.$('#lobby-start')) && !(await cl.$('#lobby-show-code')) && (await cl.textContent('#lobby-wait')).includes('Venter på host');
+await click(cl, '#lobby-map'); await cl.waitForTimeout(150); ok.clientNoMapPanel = !(await cl.$('#lobby-map-panel'));
 await click(cl, '#lobby-settings'); await cl.waitForTimeout(150);
 ok.clientReadOnly = await cl.$eval('#lobby-settings-panel .hl-set', e => e.classList.contains('ro'));
 await click(cl, '#lobby-settings-panel [data-k=roundTimeSec] [data-v="90"]');

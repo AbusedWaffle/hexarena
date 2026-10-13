@@ -23,6 +23,18 @@ const CSS = `
 .hl-map{position:relative;flex:1;min-width:0;border:1px solid var(--ha-edge,#22305A);background:#0B1030;overflow:hidden}
 .hl-map canvas{width:100%;height:100%;object-fit:contain;display:block;image-rendering:pixelated}
 .hl-mapname{position:absolute;right:6px;bottom:4px;font-size:11px;letter-spacing:.15em;opacity:.8;text-transform:uppercase}
+.hl-map img{width:100%;height:100%;object-fit:contain;display:block}
+.hl-map.pick{cursor:pointer}.hl-map.pick:hover{border-color:#4FA3FF}
+.hl-mapedit{position:absolute;right:6px;top:4px;font-size:10px;letter-spacing:.14em;background:rgba(79,163,255,.3);padding:1px 6px}
+.hl-mbox.maps{max-height:calc(100% - 12px)}
+.hl-maps{overflow:auto;min-height:0;display:flex;flex-direction:column;gap:6px;padding-right:4px}
+.hl-mgl{font-size:11px;letter-spacing:.2em;opacity:.65}
+.hl-mrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.hl-mc{all:unset;cursor:pointer;display:flex;flex-direction:column;background:rgba(34,48,90,.45);border:2px solid var(--ha-edge,#22305A);border-left:4px solid var(--ha-edge,#22305A)}
+.hl-mc img{width:100%;aspect-ratio:16/9;object-fit:contain;background:#0B1030;display:block}
+.hl-mc .n{display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 6px;padding:3px 6px;font-size:12px;letter-spacing:.08em}
+.hl-mc .n i{font-style:normal;opacity:.6;font-size:11px}
+.hl-mc.sel{border-color:#4FA3FF;box-shadow:0 0 12px rgba(111,160,255,.45);background:rgba(79,163,255,.18)}
 .hl-mapcode{position:absolute;left:6px;top:4px;font-size:11px;letter-spacing:.12em;background:rgba(6,9,26,.7);padding:1px 5px}
 .hl-codebox{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
 .hl-qr{background:#fff;padding:4px;height:clamp(60px,26vh,150px);aspect-ratio:1;box-sizing:border-box}
@@ -91,12 +103,24 @@ globalThis.__lobbySettings = pub(settings);
 function normalize(x) {
   const t = Number(x.teamSize) || 3, max = 2 * t - 1;
   const bc = x.botCount === 'fill' || x.botCount == null ? 'fill' : Math.max(0, Math.min(max, Number(x.botCount)));
-  return { teamSize: t, bots: x.bots !== false, botCount: bc, botDifficulty: x.botDifficulty || 'normal', roundsToWin: Number(x.roundsToWin) || 3, roundTimeSec: Number(x.roundTimeSec) || 75 };
+  return { teamSize: t, bots: x.bots !== false, botCount: bc, botDifficulty: x.botDifficulty || 'normal', roundsToWin: Number(x.roundsToWin) || 3, roundTimeSec: Number(x.roundTimeSec) || 75, map: x.map || DEF.map || 'paintyard_sq_01' };
 }
 const emit = (name, detail) => globalThis.dispatchEvent(new CustomEvent(name, { detail }));
 const editable = () => mode !== 'client' && !started;
 
-fetch(new URL('../data/map_paintyard_sq_01.json', import.meta.url)).then(r => r.json()).then(m => { map = m; render(); }).catch(() => {});
+// Baner fra data/maps.json; kortet i lobbyen viser art/maps/<id>.png (fallback: tegning fra banefilen).
+let MAPS = null, mapCache = {};
+const mapInfo = () => MAPS?.maps.find(m => m.id === settings.map) || MAPS?.maps.find(m => m.id === MAPS.default) || null;
+function loadMapFile() {
+  const i = mapInfo(), f = i?.file || 'data/map_paintyard_sq_01.json';
+  if (mapCache[f]) { map = mapCache[f]; return; }
+  fetch(new URL('../' + f, import.meta.url)).then(r => r.json()).then(m => { mapCache[f] = m; if ((mapInfo()?.file || 'data/map_paintyard_sq_01.json') === f) { map = m; render(); } }).catch(() => {});
+}
+fetch(new URL('../data/maps.json', import.meta.url)).then(r => r.json()).then(j => {
+  MAPS = j; if (!DEF.map) DEF.map = j.default;
+  if (!MAPS.maps.some(m => m.id === settings.map)) settings = normalize({ ...settings, map: j.default });
+  globalThis.__lobbySettings = pub(settings); loadMapFile(); render();
+}).catch(() => loadMapFile());
 fetch(new URL('../data/menu.json', import.meta.url)).then(r => r.json()).then(m => {
   M = m; const L = m.lobbySettings;
   if (L) {
@@ -156,6 +180,7 @@ function setSettings(patch) {
   const out = pub(settings); globalThis.__lobbySettings = out;
   persist({ lobbySettings: settings, difficulty: settings.botDifficulty, teamSize: settings.teamSize });
   emit('hexarena:lobby-settings', { settings: out });
+  loadMapFile();
   render();
 }
 function setClass(c) {
@@ -202,7 +227,10 @@ function render() {
   menu.append(...items);
 
   const card = el('div', 'hl-card');
-  const mp = el('div', 'hl-map'); mp.append(drawMap(), el('div', 'hl-mapname', map?.name || 'Paintyard'));
+  const mi_ = mapInfo(), mp = el('div', 'hl-map' + (editable() ? ' pick' : '')); mp.id = 'lobby-map';
+  if (mi_) { const im = el('img'); im.alt = ''; im.src = new URL(`../art/maps/${mi_.id}.png`, import.meta.url).href; im.onerror = () => im.replaceWith(drawMap()); mp.append(im); } else mp.append(drawMap());
+  const mn = el('div', 'hl-mapname', mi_?.name || map?.name || 'Paintyard'); mn.id = 'lobby-map-name'; mp.append(mn);
+  if (editable()) { mp.append(el('div', 'hl-mapedit', 'SKIFT BANE')); mp.onclick = () => { panel = 'map'; render(); }; }
   if (code) mp.append(el('div', 'hl-mapcode', 'KODE ' + code));
   card.append(mp);
   const s = el('div', 'hl-status' + (status === 'error' ? ' err' : ''),
@@ -243,10 +271,28 @@ function modal() {
     col.append(el('div', 'hl-sub', 'Spilkode'), codeEl, sh, close);
     box.append(qr, col); m.append(box); return m;
   }
-  const box = el('div', 'hl-mbox wide'); box.id = panel === 'class' ? 'lobby-class-panel' : 'lobby-settings-panel';
+  if (panel === 'map' && !(editable() && MAPS)) { panel = null; return el('div'); }
+  const box = el('div', 'hl-mbox wide' + (panel === 'map' ? ' maps' : '')); box.id = { class: 'lobby-class-panel', map: 'lobby-map-panel' }[panel] || 'lobby-settings-panel';
   const head = el('div', 'hl-mhead');
-  head.append(el('span', '', panel === 'class' ? 'VÆLG KLASSE' : 'INDSTILLINGER' + (editable() ? '' : ' · KUN HOST')), close);
+  head.append(el('span', '', panel === 'class' ? 'VÆLG KLASSE' : panel === 'map' ? 'VÆLG BANE' : 'INDSTILLINGER' + (editable() ? '' : ' · KUN HOST')), close);
   box.append(head);
+  if (panel === 'map') {
+    const list = el('div', 'hl-maps'), order = ['small', 'medium', 'large'];
+    for (const sz of order) {
+      const ms = MAPS.maps.filter(m => m.size === sz).sort((a, b) => a.width * a.height - b.width * b.height); if (!ms.length) continue;
+      const row = el('div', 'hl-mrow');
+      for (const m of ms) {
+        const c = el('button', 'hl-mc' + (m.id === settings.map ? ' sel' : '')); c.dataset.map = m.id;
+        const im = el('img'); im.alt = ''; im.loading = 'lazy'; im.src = new URL(`../art/maps/${m.id}.png`, import.meta.url).href;
+        const n = el('div', 'n'); const nm = el('span', '', m.name); const i = el('i', '', `${m.width}×${m.height} · ${m.players[0] === m.players[1] ? m.players[0] : m.players.join('–')} pr. hold`);
+        n.append(nm, i); c.append(im, n);
+        c.onclick = () => { panel = null; setSettings({ map: m.id }); };
+        row.append(c);
+      }
+      list.append(el('div', 'hl-mgl', (MAPS.sizes?.[sz] || sz).toUpperCase()), row);
+    }
+    box.append(list); m.append(box); return m;
+  }
   if (panel === 'class') {
     const classes = M?.classes || ICONS.map(i => ({ id: i[0].toUpperCase() + i.slice(1), name: i[0].toUpperCase() + i.slice(1), role: '', stats: {} }));
     const cards = el('div', 'hl-cards' + (started ? ' ro' : '')), det = el('div', 'hl-det');
@@ -293,7 +339,7 @@ globalThis.addEventListener('hexarena:lobby', (e) => {
   if (d.mode) mode = d.mode; else if (d.isHost === true) mode = 'host'; else if (d.isHost === false) mode = 'client';
   if (d.code) code = d.code;
   if (d.roster) roster = d.roster;
-  if (d.settings && mode === 'client') { settings = normalize(d.settings.botFill ? { ...d.settings, botCount: 'fill' } : d.settings); globalThis.__lobbySettings = pub(settings); }
+  if (d.settings && mode === 'client') { settings = normalize(d.settings.botFill ? { ...d.settings, botCount: 'fill' } : d.settings); globalThis.__lobbySettings = pub(settings); loadMapFile(); }
   if (d.started && !started) { started = true; if (mode === 'client') { open = false; panel = null; } }
   if (d.status) { status = d.status; error = d.error || ''; if (status === 'error') open = true; }
   render();
