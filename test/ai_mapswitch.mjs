@@ -13,6 +13,6 @@ for (const m of maps) {
   for (let t = 0; t < 20 * (m.size === "large" ? 70 : 40); t++) { step(w, ai.frames()); for (const e of w.events) if (e.type === 'kill') kills++; }
   const bad = ai.debug().filter(d => !d.post || d.post.x >= w.map.width || d.post.y >= w.map.height || isBlocking(w.tiles.get(d.post.x + ',' + d.post.y)));
   const ok = !bad.length && kills > 0; if (!ok) fail++;
-  console.log(m.id, ok ? 'OK' : 'FEJL', { kills, badPosts: bad.length });
+  console.log(m.id, ok ? 'OK' : 'FEJL', { kills, badPosts: bad.length, bad: bad.map(d => d.role + '@' + d.post.x + ',' + d.post.y + ':' + w.tiles.get(d.post.x + ',' + d.post.y)?.type) });
 }
 process.exit(fail ? 1 : 0);

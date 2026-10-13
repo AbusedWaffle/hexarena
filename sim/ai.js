@@ -349,6 +349,7 @@ export function createAI(w, cfg, seed = 1) {
       if (e.type === 'crateBroken' || e.type === 'crateRespawned') mapVersion++;
       if (e.type === 'roundStart') { for (const b of bots.values()) resetBot(b); assignRoles(); } // ny runde: glem viden, mål og stier
     }
+    for (const b of bots.values()) for (const k of ['post', 'pushPost']) if (b[k] && !freeTile(b[k].x, b[k].y)) b[k] = postNear(b[k].x, b[k].y); // kasse dukket op på posten: flyt til nærmeste frie felt
     updateIntel();
     const out = {};
     for (const b of bots.values()) {
