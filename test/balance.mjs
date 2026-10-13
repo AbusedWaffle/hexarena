@@ -4,7 +4,7 @@ import fs from 'node:fs';
 const { createWorld, addPlayer, step } = await import('../sim/world.js');
 const { createAI } = await import('../sim/ai.js');
 const rd = (f) => JSON.parse(fs.readFileSync(new URL('../data/' + f, import.meta.url)));
-const map = rd('map_paintyard_sq_01.json'), classes = rd('classes.square.json'), cfg = rd('ai.json');
+const map = rd('map_' + (process.env.MAP || 'paintyard_sq_01') + '.json'), classes = rd('classes.square.json'), cfg = rd('ai.json');
 const N = Number(process.argv[2] ?? 40), diff = process.argv[3] ?? 'normal';
 const CL = ['Assault', 'Sniper', 'Engineer', 'Scout', 'Support'];
 const st = Object.fromEntries(CL.map(c => [c, { games: 0, wins: 0, kills: 0, deaths: 0, dmg: 0, heal: 0 }]));

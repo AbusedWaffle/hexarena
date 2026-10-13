@@ -1,175 +1,175 @@
 {
-  "_note": "Kvadratisk grid: afstande i tiles (1 tile ≈ ½ tidligere hex), tid i sekunder. Én ladning = én salve. projectileSpeed 0 = hitscan. shape peger på SHAPES i art/palette.js.",
-  "Assault": {
-    "hp": 100,
-    "speed": 3.0,
-    "shape": "assault",
-    "weapon": {
-      "damage": 9,
-      "charges": 3,
-      "rechargeSec": 1.4,
-      "shotsPerCharge": 4,
-      "shotIntervalMs": 120,
-      "fireCooldownSec": 0.5,
-      "range": 10,
-      "projectileSpeed": 28.0,
-      "pellets": 1,
-      "spreadDeg": 4,
-      "autoAimSpreadDeg": 4
-    },
-    "ability": {
-      "id": "grenade",
-      "cooldownSec": 8,
-      "damage": 35,
-      "radius": 2.0,
-      "throwRange": 10.0,
-      "fuseSec": 0.6
-    },
-    "radius": 0.42
+ "_note": "Kvadratisk grid: afstande i tiles (1 tile ≈ ½ tidligere hex), tid i sekunder. Én ladning = én salve. projectileSpeed 0 = hitscan. shape peger på SHAPES i art/palette.js.",
+ "Assault": {
+  "hp": 100,
+  "speed": 3.0,
+  "shape": "assault",
+  "weapon": {
+   "damage": 8,
+   "charges": 3,
+   "rechargeSec": 1.6,
+   "shotsPerCharge": 4,
+   "shotIntervalMs": 120,
+   "fireCooldownSec": 0.5,
+   "range": 10,
+   "projectileSpeed": 28.0,
+   "pellets": 1,
+   "spreadDeg": 4,
+   "autoAimSpreadDeg": 4
   },
-  "Sniper": {
-    "hp": 70,
-    "speed": 2.7,
-    "shape": "sniper",
-    "weapon": {
-      "damage": 55,
-      "charges": 2,
-      "rechargeSec": 2.5,
-      "shotsPerCharge": 1,
-      "shotIntervalMs": 0,
-      "fireCooldownSec": 1.4,
-      "range": 18.0,
-      "projectileSpeed": 0.0,
-      "pellets": 1,
-      "spreadDeg": 0,
-      "autoAimSpreadDeg": 4
-    },
-    "ability": {
-      "id": "focus",
-      "cooldownSec": 10,
-      "damageMult": 1.5,
-      "pierce": true,
-      "durationSec": 5
-    },
-    "radius": 0.4
+  "ability": {
+   "id": "grenade",
+   "cooldownSec": 8,
+   "damage": 35,
+   "radius": 2.0,
+   "throwRange": 10.0,
+   "fuseSec": 0.6
   },
-  "Engineer": {
-    "hp": 140,
-    "speed": 2.6,
-    "shape": "engineer",
-    "weapon": {
-      "damage": 12,
-      "charges": 3,
-      "rechargeSec": 1.5,
-      "shotsPerCharge": 1,
-      "shotIntervalMs": 0,
-      "fireCooldownSec": 0.8,
-      "range": 8,
-      "projectileSpeed": 24.0,
-      "pellets": 5,
-      "spreadDeg": 20,
-      "autoAimSpreadDeg": 4
-    },
-    "ability": {
-      "id": "deploy_crate",
-      "cooldownSec": 12,
-      "crateHp": 80,
-      "placeRange": 1
-    },
-    "radius": 0.42
+  "radius": 0.42
+ },
+ "Sniper": {
+  "hp": 80,
+  "speed": 2.7,
+  "shape": "sniper",
+  "weapon": {
+   "damage": 55,
+   "charges": 2,
+   "rechargeSec": 2.5,
+   "shotsPerCharge": 1,
+   "shotIntervalMs": 0,
+   "fireCooldownSec": 1.2,
+   "range": 18.0,
+   "projectileSpeed": 0.0,
+   "pellets": 1,
+   "spreadDeg": 0,
+   "autoAimSpreadDeg": 4
   },
-  "Scout": {
-    "hp": 105,
-    "speed": 3.8,
-    "shape": "scout",
-    "weapon": {
-      "damage": 11,
-      "charges": 3,
-      "rechargeSec": 1.0,
-      "shotsPerCharge": 6,
-      "shotIntervalMs": 90,
-      "fireCooldownSec": 0.35,
-      "range": 8,
-      "projectileSpeed": 32.0,
-      "pellets": 1,
-      "spreadDeg": 8,
-      "autoAimSpreadDeg": 4
-    },
-    "ability": {
-      "id": "dash",
-      "cooldownSec": 4,
-      "distance": 4,
-      "invulnSec": 0.25
-    },
-    "radius": 0.36
+  "ability": {
+   "id": "focus",
+   "cooldownSec": 10,
+   "damageMult": 1.5,
+   "pierce": true,
+   "durationSec": 5
   },
-  "Support": {
-    "hp": 90,
-    "speed": 3.0,
-    "shape": "support",
-    "weapon": {
-      "damage": 19,
-      "charges": 3,
-      "rechargeSec": 1.0,
-      "shotsPerCharge": 2,
-      "shotIntervalMs": 180,
-      "fireCooldownSec": 0.4,
-      "range": 12.0,
-      "projectileSpeed": 28.0,
-      "pellets": 1,
-      "spreadDeg": 3,
-      "autoAimSpreadDeg": 4
-    },
-    "ability": {
-      "id": "heal_zone",
-      "cooldownSec": 12,
-      "healPerSec": 15,
-      "radius": 3.0,
-      "durationSec": 4
-    },
-    "radius": 0.42
+  "radius": 0.4
+ },
+ "Engineer": {
+  "hp": 140,
+  "speed": 2.6,
+  "shape": "engineer",
+  "weapon": {
+   "damage": 12,
+   "charges": 3,
+   "rechargeSec": 1.5,
+   "shotsPerCharge": 1,
+   "shotIntervalMs": 0,
+   "fireCooldownSec": 0.8,
+   "range": 8,
+   "projectileSpeed": 24.0,
+   "pellets": 5,
+   "spreadDeg": 20,
+   "autoAimSpreadDeg": 4
   },
-  "_match": {
-    "mode": "knockout",
-    "durationSec": 150,
-    "killTarget": 15,
-    "respawnSec": 3,
-    "spawnShieldSec": 1.5,
-    "crateHp": 150,
-    "maxPlayers": 8,
-    "maxPerTeam": 4,
-    "crateRespawnSec": 25,
-    "crateRespawnBlockRadius": 1,
-    "regenPerSec": 8,
-    "regenDelaySec": 3,
-    "roundsToWin": 3,
-    "roundTimeSec": 75,
-    "roundIntroSec": 3,
-    "respawnInRound": false,
-    "roundTimeoutWinner": "most_alive_then_hp",
-    "resetOnRound": [
-      "positions",
-      "hp",
-      "charges",
-      "abilityCooldown",
-      "crates",
-      "grenades",
-      "zones"
-    ],
-    "_modes": "knockout = runder uden respawn, først til roundsToWin; tdm = gammel tilstand med respawn (durationSec/killTarget/respawnSec).",
-    "facingHoldSec": 0.4,
-    "turnRateDeg": 720
+  "ability": {
+   "id": "deploy_crate",
+   "cooldownSec": 12,
+   "crateHp": 80,
+   "placeRange": 1
   },
-  "_ai": {
-    "maxRetreatingPerTeam": 1,
-    "visionRange": 16
+  "radius": 0.42
+ },
+ "Scout": {
+  "hp": 105,
+  "speed": 3.8,
+  "shape": "scout",
+  "weapon": {
+   "damage": 11,
+   "charges": 3,
+   "rechargeSec": 1.0,
+   "shotsPerCharge": 6,
+   "shotIntervalMs": 90,
+   "fireCooldownSec": 0.35,
+   "range": 8,
+   "projectileSpeed": 32.0,
+   "pellets": 1,
+   "spreadDeg": 8,
+   "autoAimSpreadDeg": 4
   },
-  "_autoAim": {
-    "coneDeg": 360,
-    "preferInAimDirDeg": 60,
-    "targetStickySec": 0.6,
-    "leadTarget": 0.5,
-    "lowHpBias": 0.3,
-    "requireLineOfSight": true
-  }
+  "ability": {
+   "id": "dash",
+   "cooldownSec": 4,
+   "distance": 4,
+   "invulnSec": 0.25
+  },
+  "radius": 0.36
+ },
+ "Support": {
+  "hp": 90,
+  "speed": 3.0,
+  "shape": "support",
+  "weapon": {
+   "damage": 19,
+   "charges": 3,
+   "rechargeSec": 1.0,
+   "shotsPerCharge": 2,
+   "shotIntervalMs": 180,
+   "fireCooldownSec": 0.4,
+   "range": 12.0,
+   "projectileSpeed": 28.0,
+   "pellets": 1,
+   "spreadDeg": 3,
+   "autoAimSpreadDeg": 4
+  },
+  "ability": {
+   "id": "heal_zone",
+   "cooldownSec": 12,
+   "healPerSec": 15,
+   "radius": 3.0,
+   "durationSec": 4
+  },
+  "radius": 0.42
+ },
+ "_match": {
+  "mode": "knockout",
+  "durationSec": 150,
+  "killTarget": 15,
+  "respawnSec": 3,
+  "spawnShieldSec": 1.5,
+  "crateHp": 150,
+  "maxPlayers": 8,
+  "maxPerTeam": 4,
+  "crateRespawnSec": 25,
+  "crateRespawnBlockRadius": 1,
+  "regenPerSec": 8,
+  "regenDelaySec": 3,
+  "roundsToWin": 3,
+  "roundTimeSec": 75,
+  "roundIntroSec": 3,
+  "respawnInRound": false,
+  "roundTimeoutWinner": "most_alive_then_hp",
+  "resetOnRound": [
+   "positions",
+   "hp",
+   "charges",
+   "abilityCooldown",
+   "crates",
+   "grenades",
+   "zones"
+  ],
+  "_modes": "knockout = runder uden respawn, først til roundsToWin; tdm = gammel tilstand med respawn (durationSec/killTarget/respawnSec).",
+  "facingHoldSec": 0.4,
+  "turnRateDeg": 720
+ },
+ "_ai": {
+  "maxRetreatingPerTeam": 1,
+  "visionRange": 16
+ },
+ "_autoAim": {
+  "coneDeg": 360,
+  "preferInAimDirDeg": 60,
+  "targetStickySec": 0.6,
+  "leadTarget": 0.5,
+  "lowHpBias": 0.3,
+  "requireLineOfSight": true
+ }
 }
