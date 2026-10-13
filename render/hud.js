@@ -21,7 +21,7 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
   const layer = scene.add.container(0, 0, [g, scoreB, scoreR, clock, center, abilTxt]).setScrollFactor(0).setDepth(20);
   const fitLayer = () => { const z = scene.cameras.main.zoom; layer.setScale(1 / z).setPosition(640 - 640 / z, 360 - 360 / z); };
   const toScreen = (wx, wy) => { const c = scene.cameras.main, v = c.worldView; return { x: (wx - v.x) * c.zoom, y: (wy - v.y) * c.zoom }; };
-  const M = HUD.mini, mw = map.width * M.tile, mh = map.height * M.tile, mx0 = 1280 - M.margin - mw, my0 = M.margin;
+  const M = HUD.mini; let mw, mh, mx0, my0; // følger world.map, så baneskift i lobbyen også skifter minikort
   const isTouch = scene.sys.game.device.input.touch;
   let lastRoundMsg = null;
 
@@ -57,6 +57,7 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
         }
       }
 
+      map = world.map; mw = map.width * M.tile; mh = map.height * M.tile; mx0 = 1280 - M.margin - mw; my0 = M.margin;
       // minikort: vægge, kasser, spawn-zoner, egne folk; fjender kun med synslinje
       g.fillStyle(PALETTE.bg, 0.8).fillRect(mx0 - 3, my0 - 3, mw + 6, mh + 6).lineStyle(1, PALETTE.wallEdge, 0.8).strokeRect(mx0 - 3, my0 - 3, mw + 6, mh + 6);
       if (map.spawnZones) for (const [team, z] of Object.entries(map.spawnZones)) g.fillStyle(team === 'blue' ? PALETTE.blue : PALETTE.red, 0.18).fillRect(mx0 + z.x0 * M.tile, my0, (z.x1 - z.x0 + 1) * M.tile, mh);

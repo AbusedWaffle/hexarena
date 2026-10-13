@@ -6,10 +6,20 @@ const PLAYER_RADIUS = 0.4; // tiles, fallback hvis klassen ikke har radius
 const CRATE_WARN_SEC = 1.5;
 const ROUND_END_SEC = 2.5; // resultat vises, før næste runde nulstilles (matcher HUD) // varsel før kasse-respawn (matcher FX.crateRespawn)
 
-export function createWorld(map, classes) {
+function buildTiles(map, classes) {
   const tiles = new Map(), crateHp = classes._match.crateHp ?? 100;
   for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) tiles.set(key(x, y), { x, y, type: 'floor', hp: 0, maxHp: crateHp });
   for (const t of map.tiles) { const c = tiles.get(key(t.x, t.y)); if (!c) continue; c.type = t.type; if (t.type === 'crate') c.hp = crateHp; }
+  return tiles;
+}
+// Skift bane (lobby): nye tiles/kasser, skud og zoner ryddes, alle spawner på den nye banes spawns.
+export function setMap(w, map) {
+  w.map = map; w.tiles = buildTiles(map, w.classes); w.projectiles.length = 0; w.grenades.length = 0; w.zones.length = 0;
+  for (const p of w.players) { p.deployedCrate = null; spawn(w, p); }
+  w.mapVersion = (w.mapVersion || 0) + 1;
+}
+export function createWorld(map, classes) {
+  const tiles = buildTiles(map, classes);
   return { map, classes, tiles, players: [], projectiles: [], grenades: [], zones: [], events: [], tick: 0,
     match: newMatch(classes._match), nextId: 1 };
 }

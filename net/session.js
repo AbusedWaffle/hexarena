@@ -87,6 +87,9 @@ const roundEvent = (e) => { const o = {}; for (const [k, v] of Object.entries(e)
 // opts: { map, classes, cls, name, onWelcome, onRoster, onFull }
 export function createClientSession(transport, opts) {
   const world = createWorld(opts.map, opts.classes);
+  // Kassetilstand fra welcome; lægges på igen efter et baneskift (sen join midt i en kamp på en anden bane end standard).
+  let welcomeTiles = null, welcomeMap = null;
+  const applyTiles = () => { for (const [x, y, hp, maxHp] of welcomeTiles || []) { const t = world.tiles.get(x + ',' + y); if (!t) continue; t.type = hp > 0 ? 'crate' : 'floor'; t.hp = hp; t.maxHp = maxHp; } };
   let you = null, roster = [], lastTick = -1, view = null, pending = [], eventQueue = [];
   const remap = (id) => id === you ? 'me' : id === 'me' ? 'host' : id;
 
@@ -115,7 +118,7 @@ export function createClientSession(transport, opts) {
   transport.onMessage((_k, ch, m) => {
     if (m.t === 'welcome') {
       you = m.you; syncRoster(m.roster); if (m.settings) opts.onSettings?.(m.settings, m.started);
-      for (const [x, y, hp, maxHp] of m.tiles) { const t = world.tiles.get(x + ',' + y); if (!t) continue; t.type = hp > 0 ? 'crate' : 'floor'; t.hp = hp; t.maxHp = maxHp; }
+      welcomeTiles = m.tiles; welcomeMap = m.settings?.map ?? null; applyTiles();
       opts.onWelcome?.(world.players.find(p => p.id === 'me'));
     } else if (m.t === 'roster') syncRoster(m.roster);
     else if (m.t === 'full') opts.onFull?.();
@@ -135,7 +138,7 @@ export function createClientSession(transport, opts) {
     }
   });
   return {
-    world, get you() { return you; }, get ready() { return !!(you && view); },
+    world, get you() { return you; }, applyTiles(mapId) { if (mapId === welcomeMap) applyTiles(); }, get ready() { return !!(you && view); },
     setClass(cls) { transport.send('host', 'r', { t: 'cls', cls }); },
     sendInput(f) { // kaldes hvert lokalt tick (20 Hz) med egen InputFrame
       pending.push(f); if (pending.length > 60) pending.shift();

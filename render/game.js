@@ -3,14 +3,18 @@ import { drawUnit } from '../art/shapes.js';
 import { AbilityFx } from '../art/abilityFx.js';
 import { TILE_PX } from '../sim/grid.js';
 import { drawSquareMap } from '../art/squareMap.js';
-import { createWorld, addPlayer, step, snapshot, raycast, DT, setClass, setTeam, startMatch } from '../sim/world.js';
+import { createWorld, setMap, addPlayer, step, snapshot, raycast, DT, setClass, setTeam, startMatch } from '../sim/world.js';
 import { createInputSystem } from './inputSystem.js';
 import { createHud } from './hud.js';
 import { createAI } from '../sim/ai.js';
 import { createPeerHost, createPeerClient, createBcHost, createBcClient, makeCode } from '../net/transport.js';
 import { createHostSession, createClientSession } from '../net/session.js';
 
-const [map, classes, aiCfg] = await Promise.all(['data/map_paintyard_sq_01.json', 'data/classes.square.json', 'data/ai.json'].map(u => fetch(u).then(r => r.json())));
+const [MAPS, classes, aiCfg] = await Promise.all(['data/maps.json', 'data/classes.square.json', 'data/ai.json'].map(u => fetch(u).then(r => r.json())));
+// Baner: data/maps.json (Game Designer). Valgt bane = lobbySettings.map; ?map=<id> virker også uden lobby.
+const mapCache = new Map(), mapInfo = (id) => MAPS.maps.find(m => m.id === id);
+const loadMap = (id) => { const i = mapInfo(id) || mapInfo(MAPS.default); if (!mapCache.has(i.id)) mapCache.set(i.id, fetch(i.file).then(r => r.json()).then(m => ({ ...m, id: i.id }))); return mapCache.get(i.id); };
+const map = await loadMap(new URLSearchParams(location.search).get('map') || globalThis.__lobbySettings?.map || MAPS.default);
 // URL: ?diff=easy|normal|hard  &red=3 (antal røde bots)  &blue=0 (blå holdkammerater)  &aidebug=1
 const QS = new URLSearchParams(location.search), AI_DIFF = QS.get('diff') || 'normal', AI_DEBUG = QS.has('aidebug');
 // Multiplayer: ?host=1 opretter et spil (kode vises), ?room=KODE deltager. Ellers singleplayer mod bots.
@@ -29,7 +33,7 @@ class Arena extends Phaser.Scene {
     this.ai = null; this.net = null; this.client = null;
     if (MODE === 'client') {
       this.client = createClientSession((QS.get('net') === 'bc' ? createBcClient : createPeerClient)(ROOM), { map, classes, cls: MY_CLS,
-        onWelcome: (me) => { this.me = me; }, onSettings: (st, started) => { globalThis.__lobbySettings = st; globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { mode: 'client', isHost: false, status: 'open', settings: st, started: !!started } })); }, onFull: () => this.netMsg?.setText('Spillet er fuldt') });
+        onWelcome: (me) => { this.me = me; }, onSettings: (st, started) => { globalThis.__lobbySettings = st; if (st?.map && mapInfo(st.map)) this.swapMap(st.map); globalThis.dispatchEvent(new CustomEvent('hexarena:lobby', { detail: { mode: 'client', isHost: false, status: 'open', settings: st, started: !!started } })); }, onFull: () => this.netMsg?.setText('Spillet er fuldt') });
       this.world = this.client.world;
       addEventListener('hexarena:lobby-class', (e) => { if (classes[e.detail?.cls]) this.client.setClass(e.detail.cls); });
       this.me = { x: 0, y: 0, team: 'blue', cls: MY_CLS, alive: false }; // pladsholder, indtil hosten svarer
@@ -84,6 +88,7 @@ class Arena extends Phaser.Scene {
   // Lobby-indstillinger (kun host/lokal): holdstørrelse, bots til/fra, antal, sværhedsgrad, runder og rundelængde. Træder i kraft ved 'Start kampen'.
   applyLobbySettings(st, quiet = false) {
     if (this.started) return; if (st) this.settings = { ...this.settings, ...(st.botCount != null && !('botFill' in st) ? { botFill: false } : {}), ...st }; st = this.settings; if (!st) return;
+    if (st.map && mapInfo(st.map) && st.map !== this.world.map.id) { this.swapMap(st.map).then(ok => ok && this.applyLobbySettings(null, quiet)); return; }
     const w = this.world, mc = w.classes._match, size = Math.max(1, Math.min(4, st.teamSize | 0 || 3));
     mc.maxPerTeam = size; if (st.roundsToWin) mc.roundsToWin = +st.roundsToWin; if (st.roundTimeSec) mc.roundTimeSec = +st.roundTimeSec;
     const diff = st.botDifficulty || AI_DIFF; if (this.netOpts) this.netOpts.aiDifficulty = diff;
@@ -97,6 +102,14 @@ class Arena extends Phaser.Scene {
     this.lobbyEmit({ settings: st, roster: this.rosterNow() });
     if (this.net) { this.net.sendSettings(st); if (!quiet) this.net.sendRoster(); }
   }
+  // Skift bane på stedet (host, lokal og klient): nye tiles/kasser og spawns, banen tegnes igen. Seneste valg vinder.
+  async swapMap(id) {
+    this.wantMap = id; const m = await loadMap(id);
+    if (this.wantMap !== id || this.started && MODE !== 'client' || this.world.map.id === m.id) return false;
+    setMap(this.world, m); if (MODE === 'client') this.client?.applyTiles?.(m.id); if (this.staticG) { this.staticG.clear(); this.drawMap(); }
+    if (this.cur && MODE !== 'client') this.prev = this.cur = snapshot(this.world);
+    return true;
+  }
   onLobbyStart() {
     if (this.started || !LOBBY || MODE === 'client') return;
     this.started = true; startMatch(this.world); this.net?.sendSettings(this.settings, true); this.net?.sendRoster();
@@ -107,7 +120,7 @@ class Arena extends Phaser.Scene {
   }
   drawMap() {
     // banen fra Artists drawSquareMap, med aktuel kasse-tilstand (ødelagte kasser tegnes ikke)
-    const live = { ...map, tiles: [...this.world.tiles.values()].filter(t => t.type !== 'floor').map(t => ({ x: t.x, y: t.y, type: t.type })) };
+    const live = { ...this.world.map, tiles: [...this.world.tiles.values()].filter(t => t.type !== 'floor').map(t => ({ x: t.x, y: t.y, type: t.type })) };
     drawSquareMap(this.staticG, live, TILE_PX, (x, y) => { const t = this.world.tiles.get(x + ',' + y); return FX.crateDamageTint[Math.min(2, Math.floor((1 - t.hp / t.maxHp) * 3))]; });
   }
   update(_, dtMs) {
