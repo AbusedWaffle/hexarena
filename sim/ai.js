@@ -53,8 +53,12 @@ export function createAI(w, cfg, seed = 1) {
   // ---------- Taktik: roller, poster, viden ----------
   const P = (id) => w.players.find(q => q.id === id);
   const alive = (team) => w.players.filter(q => q.alive && q.team === team).length;
-  const W = w.map.width, H = w.map.height;
-  const sideX = {}; for (const team of ['blue', 'red']) { const sp = w.map.spawns[team]; sideX[team] = sp.reduce((a, t) => a + t.x, 0) / sp.length; }
+  let W, H, curMap = null, curMapVer = -1; const sideX = {}, sniperPostCache = {};
+  function loadGeometry() { // kaldes ved oprettelse og når banen skiftes (setMap)
+    curMap = w.map; curMapVer = w.mapVersion || 0; W = w.map.width; H = w.map.height;
+    for (const team of ['blue', 'red']) { const sp = w.map.spawns[team]; sideX[team] = sp.reduce((a, t) => a + t.x, 0) / sp.length; delete sniperPostCache[team]; }
+  }
+  loadGeometry();
   const towardCenter = (team) => (sideX[team] < W / 2 ? 1 : -1);
   const freeTile = (x, y) => { const t = w.tiles.get(key(x, y)); return t && !isBlocking(t); };
   const coverNear = (x, y) => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => !freeTile(x + dx, y + dy));
@@ -68,7 +72,6 @@ export function createAI(w, cfg, seed = 1) {
     return best && { x: best.x, y: best.y };
   }
   // Sniper-post: i egen halvdel, den tile der ser flest felter i midten af banen
-  const sniperPostCache = {};
   function sniperPost(team) {
     if (sniperPostCache[team]) return sniperPostCache[team];
     const dir = towardCenter(team), x0 = sideX[team], samples = [];
@@ -341,6 +344,7 @@ export function createAI(w, cfg, seed = 1) {
 
   // Kaldes én gang pr. tick før step(). Læser seneste tick's events (kasser ændret => ny sti).
   function frames() {
+    if (w.map !== curMap || (w.mapVersion || 0) !== curMapVer) { loadGeometry(); mapVersion++; for (const b of bots.values()) resetBot(b); assignRoles(); } // ny bane: nye lanes, poster og stier
     for (const e of w.events) {
       if (e.type === 'crateBroken' || e.type === 'crateRespawned') mapVersion++;
       if (e.type === 'roundStart') { for (const b of bots.values()) resetBot(b); assignRoles(); } // ny runde: glem viden, mål og stier

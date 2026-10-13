@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const { createWorld, addPlayer, step, tileAt, isBlocking } = await import('../sim/world.js');
 const { createAI } = await import('../sim/ai.js');
 const rd = (f) => JSON.parse(fs.readFileSync(new URL('../data/' + f, import.meta.url)));
-const map = rd('map_paintyard_sq_01.json'), classes = rd('classes.square.json'), cfg = rd('ai.json');
+const map = rd('map_' + (process.env.MAP || 'paintyard_sq_01') + '.json'), classes = rd('classes.square.json'), cfg = rd('ai.json');
 const seed = Number(process.argv[2] ?? 1), dBlue = process.argv[3] ?? 'normal', dRed = process.argv[4] ?? 'normal';
 let s = seed; Math.random = () => (s = (s * 16807) % 2147483647) / 2147483647;
 const w = createWorld(map, classes), ai = createAI(w, cfg, seed);
