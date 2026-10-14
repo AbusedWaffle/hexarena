@@ -1,6 +1,6 @@
 // HexArena service worker. Netværk først (så nye commits altid slår igennem), cache som offline-fallback.
 // Bump VERSION ved udgivelse for at rydde gamle caches.
-const VERSION = 'hexarena-v5';
+const VERSION = 'hexarena-v6';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'vendor/phaser.min.js',
   'render/game.js', 'render/hud.js', 'render/inputSystem.js',
   'sim/world.js', 'sim/grid.js', 'sim/ai.js', 'net/transport.js', 'net/codec.js', 'net/session.js', 'vendor/peerjs.min.js',
@@ -8,8 +8,8 @@ const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'vendor/phaser.min.js
   'data/classes.square.json', 'data/ai.json',
   'icons/icon-192.png', 'icons/icon-512.png',
   'ui/menu.js', 'ui/lobby.js', 'ui/spectate.js', 'ui/ingame.js', 'vendor/qrcode.mjs', 'ui/menu.css', 'art/menu.css', 'data/menu.json', 'data/maps.json', 'data/modes.json',
-  ...['paintyard_sq_01', 'alley_sq_01', 'cross_sq_01', 'warehouse_sq_01', 'canal_sq_01', 'factory_sq_01'].flatMap((id) => ['data/map_' + id + '.json', 'art/maps/' + id + '.png']),
-  'data/map_harbor_sq_01.json', 'data/map_city_sq_01.json', // previews til Havnen/Byen mangler endnu (art/maps)
+  ...['paintyard_sq_01', 'alley_sq_01', 'cross_sq_01', 'warehouse_sq_01', 'canal_sq_01', 'factory_sq_01', 'harbor_sq_01', 'city_sq_01'].flatMap((id) => ['data/map_' + id + '.json', 'art/maps/' + id + '.png']),
+  'art/modeFx.js', 'sim/modes.js',
   ...['assault', 'sniper', 'engineer', 'scout', 'support'].map((c) => 'art/icons/' + c + '_blue.svg')];
 
 self.addEventListener('install', (e) => {
