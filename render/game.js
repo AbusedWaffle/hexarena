@@ -26,7 +26,7 @@ addEventListener('hexarena:spectate-next', () => { const S = globalThis.__arena?
 addEventListener('hexarena:lobby-reset', () => { globalThis.__lobbyStarted = false; globalThis.__arena?.onLobbyReset?.(); });
 addEventListener('hexarena:lobby-start', () => { globalThis.__lobbyStarted = true; globalThis.__arena?.onLobbyStart?.(); });
 // ?lobby=1: også spil mod robotter starter i lobbyen (menuen sætter det). Uden den starter et lokalt spil straks, som testlinks forventer.
-const LOBBY = QS.has('host') || QS.has('lobby');
+const LOBBY = QS.has('host') || (QS.has('lobby') && QS.get('lobby') !== '0');
 const ROOM = (QS.get('room') || '').toUpperCase(), MODE = ROOM ? 'client' : QS.has('host') ? 'host' : 'local';
 // ?mode=dom (uden lobby): lokal kamp starter direkte i tilstanden; i lobbyen er det startværdi for settings.mode
 if (MODE_DEFAULTS[QS.get('mode')]) classes._match.mode = QS.get('mode');
