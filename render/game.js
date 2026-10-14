@@ -19,6 +19,7 @@ const map = await loadMap(new URLSearchParams(location.search).get('map') || glo
 const QS = new URLSearchParams(location.search), AI_DIFF = QS.get('diff') || 'normal', AI_DEBUG = QS.has('aidebug');
 // Multiplayer: ?host=1 opretter et spil (kode vises), ?room=KODE deltager. Ellers singleplayer mod bots.
 addEventListener('hexarena:spectate-next', () => { const S = globalThis.__arena?.spec; if (S?.id) S.next = true; });
+addEventListener('hexarena:lobby-reset', () => { globalThis.__lobbyStarted = false; globalThis.__arena?.onLobbyReset?.(); });
 addEventListener('hexarena:lobby-start', () => { globalThis.__lobbyStarted = true; globalThis.__arena?.onLobbyStart?.(); });
 // ?lobby=1: også spil mod robotter starter i lobbyen (menuen sætter det). Uden den starter et lokalt spil straks, som testlinks forventer.
 const LOBBY = QS.has('host') || QS.has('lobby');
@@ -109,6 +110,14 @@ class Arena extends Phaser.Scene {
     setMap(this.world, m); if (MODE === 'client') this.client?.applyTiles?.(m.id); if (this.staticG) { this.staticG.clear(); this.drawMap(); }
     if (this.cur && MODE !== 'client') this.prev = this.cur = snapshot(this.world);
     return true;
+  }
+  // Host/lokal: afbryd kampen og gå tilbage til lobbyen. Kampen fryses, alle respawner, indstillinger kan ændres igen; klienter får settings med started:false.
+  onLobbyReset() {
+    if (!this.started || !LOBBY || MODE === 'client') return;
+    this.started = false; startMatch(this.world); this.spec = null; this.emitSpec?.(null);
+    this.prev = this.cur = snapshot(this.world);
+    this.lobbyEmit({ settings: this.settings, roster: this.rosterNow(), started: false });
+    this.net?.sendSettings(this.settings, false); this.net?.sendRoster();
   }
   onLobbyStart() {
     if (this.started || !LOBBY || MODE === 'client') return;
