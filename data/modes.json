@@ -90,6 +90,22 @@
     "large",
     "xl"
    ]
+  },
+  {
+   "id": "invasion",
+   "name": "Invasion",
+   "desc": "20 mod 20. Rigtige spillere tager en bots plads. Først til 100 drab.",
+   "scoreTarget": 100,
+   "timeSec": 900,
+   "respawnSec": 4,
+   "teamSize": 20,
+   "botFill": true,
+   "respawnSecByClass": {
+    "Scout": 3
+   },
+   "mapTags": [
+    "huge"
+   ]
   }
  ]
 }

@@ -4,7 +4,8 @@
   "small": "Lille",
   "medium": "Mellem",
   "large": "Stor",
-  "xl": "Kæmpe"
+  "xl": "Kæmpe",
+  "huge": "Slagmark"
  },
  "maps": [
   {
@@ -152,6 +153,21 @@
     "dom",
     "hp",
     "hq"
+   ]
+  },
+  {
+   "id": "battlefield_sq_01",
+   "name": "Slagmarken",
+   "size": "huge",
+   "width": 80,
+   "height": 56,
+   "players": [
+    20,
+    20
+   ],
+   "file": "data/map_battlefield_sq_01.json",
+   "modes": [
+    "invasion"
    ]
   }
  ]

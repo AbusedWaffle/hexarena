@@ -1,7 +1,7 @@
 import json,random
 from collections import deque
 # Store punktsymmetriske baner til spiltilstande. Zoner A/B/C holdes fri (3x3 + 1 felts kant).
-def make(mid,name,W,H,seed,nblk):
+def make(mid,name,W,H,seed,nblk,nsp=8,size="xl"):
   r=random.Random(seed);g=[['.']*W for _ in range(H)]
   for x in range(W): g[0][x]=g[H-1][x]='#'
   for y in range(H): g[y][0]=g[y][W-1]='#'
@@ -25,8 +25,8 @@ def make(mid,name,W,H,seed,nblk):
       for dy in (0,1):
         for dx in (0,1): put(x+dx,y+dy,c)
   sp={"red":[],"blue":[]}
-  for i in range(8):
-    y=H//2-4+i;x=1+(i%2)
+  for i in range(nsp):
+    y=(H//2-4+i) if nsp==8 else (H//2-nsp//4+i//2);x=1+(i%2)
     g[y][x]='.';g[H-1-y][W-1-x]='.';sp["red"].append({"x":x,"y":y});sp["blue"].append({"x":W-1-x,"y":H-1-y})
   # gange: fjern solide felter med under 2 felts åbning lodret og vandret (simpel: sikr forbundethed)
   s=(1,H//2);seen={s};q=deque([s])
@@ -39,22 +39,24 @@ def make(mid,name,W,H,seed,nblk):
   for zx,zy in (A,B,C): assert all((x,y) in seen for x in range(zx,zx+3) for y in range(zy,zy+3)),mid
   tiles=[{"x":x,"y":y,"type":{"#":"wall","x":"crate"}[g[y][x]]} for y in range(H) for x in range(W) if g[y][x]!='.']
   zones=[{"id":i,"x":zx,"y":zy,"w":3,"h":3} for i,(zx,zy) in zip("ABC",(A,B,C))]
-  m={"id":mid,"name":name,"grid":"square","width":W,"height":H,"size":"xl","rows":["".join(r) for r in g],
+  m={"id":mid,"name":name,"grid":"square","width":W,"height":H,"size":size,"rows":["".join(r) for r in g],
      "tiles":tiles,"spawns":sp,"spawnZones":{"red":{"x0":1,"x1":2},"blue":{"x0":W-3,"x1":W-2}},"zones":zones}
   json.dump(m,open(f"map_{mid}.json","w"),indent=1);print(name,W,H,len(tiles));print("\n".join(m["rows"]))
 def tryall(*a):
   for sd in range(a[4],a[4]+200):
-    try: return make(*a[:4],sd,a[5])
+    try: return make(*a[:4],sd,*a[5:])
     except AssertionError: pass
   raise SystemExit("ingen seed")
 tryall("harbor_sq_01","Havnen",40,28,7,38)
 tryall("city_sq_01","Byen",48,32,11,55)
+tryall("battlefield_sq_01","Slagmarken",80,56,21,180,20,"huge")
 MODES={"knockout":["small","medium","large","xl"],"tdm":["medium","large","xl"],"kc":["medium","large","xl"],
-       "dom":["medium","large","xl"],"hp":["medium","large","xl"],"hq":["large","xl"]}
-d=json.load(open("maps.json"));d["sizes"]["xl"]="Kæmpe"
-d["maps"]=[m for m in d["maps"] if m["id"] not in("harbor_sq_01","city_sq_01")]
+       "dom":["medium","large","xl"],"hp":["medium","large","xl"],"hq":["large","xl"],"invasion":["huge"]}
+d=json.load(open("maps.json"));d["sizes"]["xl"]="Kæmpe";d["sizes"]["huge"]="Slagmark"
+d["maps"]=[m for m in d["maps"] if m["id"] not in("harbor_sq_01","city_sq_01","battlefield_sq_01")]
 d["maps"]+= [{"id":"harbor_sq_01","name":"Havnen","size":"xl","width":40,"height":28,"players":[4,4],"file":"data/map_harbor_sq_01.json"},
-             {"id":"city_sq_01","name":"Byen","size":"xl","width":48,"height":32,"players":[4,4],"file":"data/map_city_sq_01.json"}]
+             {"id":"city_sq_01","name":"Byen","size":"xl","width":48,"height":32,"players":[4,4],"file":"data/map_city_sq_01.json"},
+             {"id":"battlefield_sq_01","name":"Slagmarken","size":"huge","width":80,"height":56,"players":[20,20],"file":"data/map_battlefield_sq_01.json"}]
 for m in d["maps"]: m["modes"]=[k for k,v in MODES.items() if m["size"] in v]
 json.dump(d,open("maps.json","w"),indent=1,ensure_ascii=False)
 modes=[
@@ -63,5 +65,9 @@ modes=[
  {"id":"kc","name":"Kill Confirmed","desc":"Saml fjendens mærke-brik op for at score. Tag holdkammeratens brik for at nægte point.","scoreTarget":30,"timeSec":480,"respawnSec":3,"tagLifeSec":30,"mapTags":MODES["kc"]},
  {"id":"dom","name":"Domination","desc":"Hold zonerne A, B og C. Hver zone giver 1 point i sekundet. Først til 200.","scoreTarget":200,"timeSec":600,"respawnSec":3,"capSec":5,"mapTags":MODES["dom"]},
  {"id":"hp","name":"Hardpoint","desc":"Stå alene i zonen for at score. Zonen flytter sig hvert 60. sekund.","scoreTarget":150,"timeSec":600,"respawnSec":3,"rotateSec":60,"mapTags":MODES["hp"]},
- {"id":"hq","name":"Headquarters","desc":"Indtag basen og forsvar den. Holdet der holder basen kan ikke respawne.","scoreTarget":200,"timeSec":600,"respawnSec":3,"capSec":6,"moveDelaySec":5,"mapTags":MODES["hq"]}]
+ {"id":"hq","name":"Headquarters","desc":"Indtag basen og forsvar den. Holdet der holder basen kan ikke respawne.","scoreTarget":200,"timeSec":600,"respawnSec":3,"capSec":6,"moveDelaySec":5,"mapTags":MODES["hq"]},
+ {"id":"invasion","name":"Invasion","desc":"20 mod 20. Rigtige spillere tager en bots plads. Først til 100 drab.","scoreTarget":100,"timeSec":900,"respawnSec":4,"teamSize":20,"botFill":True,"respawnSecByClass":{"Scout":3},"mapTags":MODES["invasion"]}]
+for m in modes:
+  if m["id"] in("tdm","kc"): m["respawnSecByClass"]={"Scout":2}
+  if m["id"]=="kc": m["scoutTagDash"]=True
 json.dump({"default":"knockout","modes":modes},open("modes.json","w"),indent=1,ensure_ascii=False)
