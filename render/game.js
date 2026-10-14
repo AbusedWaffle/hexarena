@@ -1,3 +1,4 @@
+import { MODE_DEFAULTS } from '../sim/modes.js';
 import { PALETTE, FX } from '../art/palette.js';
 import { drawUnit } from '../art/shapes.js';
 import { AbilityFx } from '../art/abilityFx.js';
@@ -92,6 +93,8 @@ class Arena extends Phaser.Scene {
     if (st.map && mapInfo(st.map) && st.map !== this.world.map.id) { this.swapMap(st.map).then(ok => ok && this.applyLobbySettings(null, quiet)); return; }
     const w = this.world, mc = w.classes._match, size = Math.max(1, Math.min(4, st.teamSize | 0 || 3));
     mc.maxPerTeam = size; if (st.roundsToWin) mc.roundsToWin = +st.roundsToWin; if (st.roundTimeSec) mc.roundTimeSec = +st.roundTimeSec;
+    // spiltilstand: knockout (standard) | tdm | kc | dom | hp | hq; scoreTarget/timeSec/respawnSec overskriver MODE_DEFAULTS
+    if (st.mode && MODE_DEFAULTS[st.mode]) { mc.mode = st.mode; mc.modeCfg = { ...(st.scoreTarget ? { scoreTarget: +st.scoreTarget } : {}), ...(st.timeSec ? { timeSec: +st.timeSec } : {}), ...(st.respawnSec ? { respawnSec: +st.respawnSec } : {}) }; }
     const diff = st.botDifficulty || AI_DIFF; if (this.netOpts) this.netOpts.aiDifficulty = diff;
     const isHuman = (p) => p.id === 'me' || (this.net && [...this.net.slots.values()].includes(p.id));
     for (const p of [...w.players]) if (!isHuman(p)) { this.ai.removeBot(p.id); w.players.splice(w.players.indexOf(p), 1); }

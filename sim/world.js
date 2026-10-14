@@ -1,4 +1,5 @@
 // Ren simulation (ingen Phaser). Hosten kalder step(world, inputs) 20 gange i sekundet.
+import { MODE_DEFAULTS, initMode, stepMode, onKillMode, respawnBlocked } from './modes.js';
 import { TILE_PX, DIRS4, DIRS8, key, tileToPixel, pixelToTile } from './grid.js';
 const U = TILE_PX; // 1 tile i px
 export const TICK_HZ = 20, DT = 1 / TICK_HZ;
@@ -26,7 +27,11 @@ export function createWorld(map, classes) {
 // Kamp-tilstand. knockout: runder uden respawn, først til roundsToWin. tdm: respawn, først til killTarget eller tiden.
 function newMatch(m) {
   if (m.mode === 'knockout') return { mode: 'knockout', score: { blue: 0, red: 0 }, round: 1, roundIntroLeft: m.roundIntroSec ?? 3, timeLeft: m.roundTimeSec ?? 75, roundEndLeft: 0, over: false };
-  return { mode: 'tdm', score: { blue: 0, red: 0 }, round: 1, roundIntroLeft: 0, timeLeft: m.durationSec, roundEndLeft: 0, over: false };
+  // respawn-tilstande (tdm, kc, dom, hp, hq): regler fra MODE_DEFAULTS, overskrevet af _match (lobby: scoreTarget, durationSec, respawnSec, …)
+  const mode = MODE_DEFAULTS[m.mode] ? m.mode : 'tdm', cfg = { ...MODE_DEFAULTS[mode], ...(m.modeCfg || {}) };
+  if (m.modeCfg?.timeSec == null && mode === 'tdm' && m.durationSec && !m.modeCfg) cfg.timeSec = m.durationSec;
+  if (mode === 'tdm' && !m.modeCfg && m.killTarget) cfg.scoreTarget = m.killTarget;
+  return { mode, cfg, score: { blue: 0, red: 0 }, round: 1, roundIntroLeft: 0, timeLeft: cfg.timeSec, roundEndLeft: 0, over: false, target: cfg.scoreTarget };
 }
 
 export function addPlayer(w, { team, cls, id }) {
@@ -212,14 +217,14 @@ function damagePlayer(w, ownerId, t, damage, extra = {}) {
   w.events.push({ type: 'hit', id: t.id, by: ownerId, damage, x: t.x, y: t.y, hp: t.hp, ...extra });
   if (t.hp <= 0) {
     const ko = w.match.mode === 'knockout';
-    t.alive = false; t.deaths++; t.respawnLeft = ko && !w.classes._match.respawnInRound ? Infinity : w.classes._match.respawnSec;
+    t.alive = false; t.deaths++; t.respawnLeft = ko && !w.classes._match.respawnInRound ? Infinity : (w.match.cfg?.respawnSec ?? w.classes._match.respawnSec);
     const k = w.players.find(q => q.id === ownerId); if (k && k.team !== t.team) k.kills++;
-    if (!ko) w.match.score[k && k.team !== t.team ? k.team : (t.team === 'blue' ? 'red' : 'blue')]++;
+    if (!ko) onKillMode(w, t, k && k.team !== t.team ? k.team : (t.team === 'blue' ? 'red' : 'blue'));
     w.events.push({ type: 'kill', id: t.id, by: ownerId, x: t.x, y: t.y, score: { ...w.match.score } });
     if (ko) { // runden slutter, når et hold er helt ude
       const alive = (team) => w.players.some(q => q.team === team && q.alive);
       if (!alive('blue') || !alive('red')) endRound(w, alive('blue') ? 'blue' : alive('red') ? 'red' : 'draw', 'eliminated');
-    } else if (w.match.score.blue >= w.classes._match.killTarget || w.match.score.red >= w.classes._match.killTarget) endMatch(w);
+    } else if (w.match.score.blue >= w.match.target || w.match.score.red >= w.match.target) endMatch(w);
   }
 }
 function damageCrate(w, t, damage) {
@@ -331,7 +336,7 @@ function resetRound(w) {
 export function startMatch(w) {
   w.match = newMatch(w.classes._match); w.match.round = 0;
   for (const p of w.players) { p.kills = 0; p.deaths = 0; }
-  resetRound(w); if (w.match.mode !== 'knockout') { w.match.roundIntroLeft = 0; w.match.timeLeft = w.classes._match.durationSec; }
+  resetRound(w); if (w.match.mode !== 'knockout') { w.match.roundIntroLeft = 0; w.match.timeLeft = w.match.cfg.timeSec; initMode(w); }
 }
 // Team-skift i lobbyen
 export function setTeam(w, p, team) { p.team = team; spawn(w, p); }
@@ -347,10 +352,10 @@ export function step(w, inputs) {
     if (m.roundEndLeft > 0) { m.roundEndLeft -= DT; if (m.roundEndLeft <= 0) resetRound(w); ackInputs(); return; } // pause mellem runder
     if (m.roundIntroLeft > 0) { if (w.tick === 1) w.events.push({ type: 'roundStart', round: m.round, introSec: m.roundIntroLeft, score: { ...m.score } }); m.roundIntroLeft = Math.max(0, m.roundIntroLeft - DT); if (m.roundIntroLeft === 0) w.events.push({ type: 'roundLive', round: m.round }); ackInputs(); return; } // nedtælling: alle står stille
     m.timeLeft = Math.max(0, m.timeLeft - DT); if (m.timeLeft === 0) endRound(w, timeoutWinner(w), 'time');
-  } else if (!m.over) { m.timeLeft = Math.max(0, m.timeLeft - DT); if (m.timeLeft === 0) endMatch(w); }
+  } else if (!m.over) { if (!m.objectives) initMode(w); m.timeLeft = Math.max(0, m.timeLeft - DT); if (m.timeLeft === 0) endMatch(w); }
   for (const p of w.players) {
     const c = w.classes[p.cls], wp = c.weapon, inp = inputs[p.id];
-    if (!p.alive) { p.respawnLeft -= DT; if (p.respawnLeft <= 0 && !w.match.over) spawn(w, p); continue; }
+    if (!p.alive) { if (!respawnBlocked(w, p)) p.respawnLeft -= DT; if (p.respawnLeft <= 0 && !w.match.over) spawn(w, p); continue; }
     if (w.match.roundEndLeft > 0) { if (inp && inp.seq != null) p.lastSeq = inp.seq; continue; } // runden er afgjort: ingen handlinger
     p.spawnShieldLeft = Math.max(0, p.spawnShieldLeft - DT);
     p.abilityCooldownLeft = Math.max(0, p.abilityCooldownLeft - DT);
@@ -407,6 +412,7 @@ export function step(w, inputs) {
     t.type = 'crate'; t.hp = t.maxHp; t.wasCrate = false; t.warnLeft = null;
     w.events.push({ type: 'crateRespawned', x: t.x, y: t.y });
   }
+  if (m.mode !== 'knockout' && !m.over && stepMode(w, DT)) endMatch(w);
 }
 
 export function updateFacing(p, rg) {
@@ -422,7 +428,11 @@ export function updateFacing(p, rg) {
 
 // Snapshot til render, HUD og netværk (samme felter overalt)
 export function snapshot(w) {
-  return { tick: w.tick, match: { mode: w.match.mode, score: { ...w.match.score }, round: w.match.round, roundIntroLeft: w.match.roundIntroLeft, timeLeft: w.match.timeLeft, over: w.match.over },
+  return { tick: w.tick, match: { mode: w.match.mode, score: { ...w.match.score }, round: w.match.round, roundIntroLeft: w.match.roundIntroLeft, timeLeft: w.match.timeLeft, over: w.match.over, target: w.match.target ?? null,
+      zoneSwapLeft: w.match.zoneSwapLeft ?? 0, respawnBlocked: w.match.respawnBlocked ?? null, active: w.match.active ?? 0 },
+    objectives: (w.match.objectives || []).map(z => ({ id: z.id, x: z.x, y: z.y, w: z.w, h: z.h, owner: z.owner, cap: z.cap, capTeam: z.capTeam,
+      active: w.match.mode === 'dom' || (w.match.active % w.match.objectives.length) === w.match.objectives.indexOf(z) })),
+    tags: (w.match.tags || []).map(t => ({ id: t.id, x: t.x, y: t.y, team: t.team })),
     players: w.players.map(p => ({ id: p.id, team: p.team, cls: p.cls, radius: p.radius, x: p.x, y: p.y, aim: p.aim, facing: p.facing ?? 0, alive: p.alive, hp: p.hp, maxHp: p.maxHp,
       charges: p.charges, chargeProgress: p.chargeProgress, abilityCooldownLeft: p.abilityCooldownLeft, spawnShieldLeft: p.spawnShieldLeft, invulnLeft: p.invulnLeft, focusLeft: p.focusLeft, respawnLeft: p.respawnLeft, autoTargetId: p.autoTargetId ?? null, lastSeq: p.lastSeq })),
     projectiles: w.projectiles.map(b => ({ id: b.id, team: b.team, x: b.x, y: b.y })),

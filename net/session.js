@@ -128,7 +128,7 @@ export function createClientSession(transport, opts) {
     else if (m.t === 's' && you) {
       if (m.s.t <= lastTick) return; // unordnet kanal: smid forældede snapshots væk
       lastTick = m.s.t;
-      const snap = decodeSnap(m.s, roster, remap);
+      const snap = decodeSnap(m.s, roster, remap, world.map);
       for (const sp of snap.players) { const p = world.players.find(q => q.id === sp.id); if (p) Object.assign(p, sp); }
       // Reconciliation: start fra hostens position for egen spiller og afspil de inputs, hosten ikke har set endnu
       const me = world.players.find(p => p.id === 'me');
