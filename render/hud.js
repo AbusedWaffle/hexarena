@@ -28,10 +28,18 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
   const M = HUD.mini; let mw, mh, mx0, my0; // følger world.map, så baneskift i lobbyen også skifter minikort
   const isTouch = scene.sys.game.device.input.touch;
   let lastRoundMsg = null;
+  const tagFx = [], tagTxt = [], TAG = { flyMs: 260, popMs: 160, toastMs: 900 };
+  const tagLabel = (i) => tagTxt[i] ??= (() => { const t = scene.add.text(0, 0, '', { fontFamily: font, fontSize: 24, fontStyle: 'bold', stroke: '#000', strokeThickness: 5 }).setOrigin(0.5).setDepth(21); layer.add(t); return t; })();
 
   return {
     // kaldes med hvert event fra sim/netværk
     onEvent(e, snap) {
+      if (e.type === 'tag' && e.dash) { // Scout dashede gennem en KC-brik: diamant i offerets farve flyver til Scouten og popper
+        const victim = e.confirmed ? (e.team === 'blue' ? 'red' : 'blue') : e.team;
+        tagFx.push({ x: e.x, y: e.y, id: e.id, col: victim === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, txt: e.confirmed ? '+1' : 'NÆGTET', ok: e.confirmed, t0: scene.time.now });
+        if (tagFx.length > 6) tagFx.shift();
+        return;
+      }
       if (e.type !== 'roundEnd') return;
       const me = snap.players.find(p => p.id === meId), mine = e.winner === me?.team;
       lastRoundMsg = e.winner === 'draw' ? { text: 'UAFGJORT RUNDE', color: hexStr(PALETTE.text), t: scene.time.now }
@@ -41,7 +49,7 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
     add(obj) { layer.add(obj); return obj; },
     toScreen,
     // til tests: synlige tilstandstekster
-    modeTexts: () => ({ mode: modeTxt.text, block: blockTxt.text, labels: objTxt.filter(Boolean).map(t => t.text).filter(Boolean) }),
+    modeTexts: () => ({ center: center.text, toasts: tagTxt.filter(Boolean).map(t => t.text).filter(Boolean), tagFx: tagFx.length, mode: modeTxt.text, block: blockTxt.text, labels: objTxt.filter(Boolean).map(t => t.text).filter(Boolean) }),
     draw(snap) {
       fitLayer(); g.clear();
       const me = snap.players.find(p => p.id === meId), m = snap.match, cam = scene.cameras.main, v = cam.worldView;
@@ -147,6 +155,20 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
       if (st.ability) g.lineStyle(2, st.ability.cancel ? PALETTE.red : PALETTE.score, 0.8).lineBetween(B.x, B.y, st.ability.x, st.ability.y).fillStyle(st.ability.cancel ? PALETTE.red : PALETTE.score, 0.6).fillCircle(st.ability.x, st.ability.y, 16);
       abilTxt.setText(ready ? (isTouch ? '★' : 'E') : left > 0 ? Math.ceil(left) : '').setAlpha(ready ? 1 : 0.8);
 
+      // KC-dash: diamant → Scout, pop og '+1'/'NÆGTET'
+      tagTxt.forEach(t => t.setText(''));
+      for (let i = tagFx.length - 1; i >= 0; i--) {
+        const f = tagFx[i], age = scene.time.now - f.t0; if (age > TAG.flyMs + TAG.toastMs) { tagFx.splice(i, 1); continue; }
+        const sc = snap.players.find(p => p.id === f.id), to = toScreen(sc?.x ?? f.x, sc?.y ?? f.y), from = toScreen(f.x, f.y);
+        if (age < TAG.flyMs) { const k = age / TAG.flyMs, e2 = k * k, x = from.x + (to.x - from.x) * e2, y = from.y + (to.y - from.y) * e2 - Math.sin(k * Math.PI) * 24, r = 9;
+          g.fillStyle(f.col, 1).fillPoints([{ x, y: y - r }, { x: x + r * 0.7, y }, { x, y: y + r }, { x: x - r * 0.7, y }], true).lineStyle(1.5, 0xffffff, 0.9).strokePoints([{ x, y: y - r }, { x: x + r * 0.7, y }, { x, y: y + r }, { x: x - r * 0.7, y }], true);
+        } else {
+          const pa = age - TAG.flyMs;
+          if (pa < TAG.popMs) g.lineStyle(3, f.col, 1 - pa / TAG.popMs).strokeCircle(to.x, to.y, 10 + pa / TAG.popMs * 26);
+          tagLabel(i).setText(f.txt).setColor(f.ok ? hexStr(PALETTE.score) : '#C9D0E6').setAlpha(1 - Math.max(0, pa - TAG.toastMs * 0.7) / (TAG.toastMs * 0.3)).setPosition(to.x, to.y - 52 - pa / TAG.toastMs * 18);
+        }
+      }
+
       // midter-besked: respawn / kamp slut
       const intro = m.roundIntroLeft || 0;
       if (lastRoundMsg && scene.time.now - lastRoundMsg.t < 2500 && !m.over) center.setText(lastRoundMsg.text).setColor(lastRoundMsg.color);
@@ -154,9 +176,14 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
       else if (m.over) center.setText(m.score.blue === m.score.red ? 'UAFGJORT' : (m.score.blue > m.score.red) === (me.team === 'blue') ? 'SEJR' : 'NEDERLAG').setColor(hexStr(PALETTE.score));
       // som tilskuer står beskeden lavt og lille, så den ikke dækker holdkammeraten i midten (bjælken øverst kommer fra ui/spectate.js)
       else if (!me.alive && knockout) center.setText('Du er ude – ser med').setColor(hexStr(PALETTE.text)).setFontSize(globalThis.__spectate?.id ? 24 : 40).setY(globalThis.__spectate?.id ? 600 : 300)
-      else if (!me.alive) center.setText(`Respawn om ${Math.max(0, me.respawnLeft).toFixed(1)}`).setColor(hexStr(PALETTE.text));
+      // respawn-tilstande: nedtælling fra spillerens egen timer (respawnSec / respawnSecByClass fra sim); HQ kan slå respawn fra for holdet
+      else if (!me.alive) {
+        const spec = !!globalThis.__spectate?.id, blocked = m.respawnBlocked && m.respawnBlocked === me.team;
+        center.setText(blocked ? 'RESPAWN SLÅET FRA' : `RESPAWN OM ${Math.max(1, Math.ceil(me.respawnLeft))}`)
+          .setColor(hexStr(blocked ? (me.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow) : PALETTE.text)).setFontSize(spec ? 26 : 40).setY(spec ? 600 : 300);
+      }
       else center.setText('');
-      if (!(!me.alive && knockout && !m.over && !(lastRoundMsg && scene.time.now - lastRoundMsg.t < 2500) && !(intro > 0))) center.setFontSize(40).setY(300);
+      if (!(!me.alive && !m.over && !(lastRoundMsg && scene.time.now - lastRoundMsg.t < 2500) && !(intro > 0))) center.setFontSize(40).setY(300);
     },
   };
 }
