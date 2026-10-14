@@ -1,0 +1,88 @@
+{
+ "default": "knockout",
+ "modes": [
+  {
+   "id": "knockout",
+   "name": "Knockout",
+   "desc": "Ingen respawn. Holdet der vinder flest runder vinder kampen.",
+   "scoreTarget": 3,
+   "timeSec": 75,
+   "respawnSec": null,
+   "mapTags": [
+    "small",
+    "medium",
+    "large",
+    "xl"
+   ]
+  },
+  {
+   "id": "tdm",
+   "name": "Team Deathmatch",
+   "desc": "Først til 30 drab. Man respawner efter 3 sekunder.",
+   "scoreTarget": 30,
+   "timeSec": 480,
+   "respawnSec": 3,
+   "mapTags": [
+    "medium",
+    "large",
+    "xl"
+   ]
+  },
+  {
+   "id": "kc",
+   "name": "Kill Confirmed",
+   "desc": "Saml fjendens mærke-brik op for at score. Tag holdkammeratens brik for at nægte point.",
+   "scoreTarget": 30,
+   "timeSec": 480,
+   "respawnSec": 3,
+   "tagLifeSec": 30,
+   "mapTags": [
+    "medium",
+    "large",
+    "xl"
+   ]
+  },
+  {
+   "id": "dom",
+   "name": "Domination",
+   "desc": "Hold zonerne A, B og C. Hver zone giver 1 point i sekundet. Først til 200.",
+   "scoreTarget": 200,
+   "timeSec": 600,
+   "respawnSec": 3,
+   "capSec": 5,
+   "mapTags": [
+    "medium",
+    "large",
+    "xl"
+   ]
+  },
+  {
+   "id": "hp",
+   "name": "Hardpoint",
+   "desc": "Stå alene i zonen for at score. Zonen flytter sig hvert 60. sekund.",
+   "scoreTarget": 150,
+   "timeSec": 600,
+   "respawnSec": 3,
+   "rotateSec": 60,
+   "mapTags": [
+    "medium",
+    "large",
+    "xl"
+   ]
+  },
+  {
+   "id": "hq",
+   "name": "Headquarters",
+   "desc": "Indtag basen og forsvar den. Holdet der holder basen kan ikke respawne.",
+   "scoreTarget": 200,
+   "timeSec": 600,
+   "respawnSec": 3,
+   "capSec": 6,
+   "moveDelaySec": 5,
+   "mapTags": [
+    "large",
+    "xl"
+   ]
+  }
+ ]
+}

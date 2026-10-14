@@ -3,7 +3,8 @@
  "sizes": {
   "small": "Lille",
   "medium": "Mellem",
-  "large": "Stor"
+  "large": "Stor",
+  "xl": "Kæmpe"
  },
  "maps": [
   {
@@ -16,7 +17,14 @@
     3,
     4
    ],
-   "file": "data/map_paintyard_sq_01.json"
+   "file": "data/map_paintyard_sq_01.json",
+   "modes": [
+    "knockout",
+    "tdm",
+    "kc",
+    "dom",
+    "hp"
+   ]
   },
   {
    "id": "alley_sq_01",
@@ -28,7 +36,10 @@
     2,
     4
    ],
-   "file": "data/map_alley_sq_01.json"
+   "file": "data/map_alley_sq_01.json",
+   "modes": [
+    "knockout"
+   ]
   },
   {
    "id": "cross_sq_01",
@@ -40,7 +51,10 @@
     2,
     4
    ],
-   "file": "data/map_cross_sq_01.json"
+   "file": "data/map_cross_sq_01.json",
+   "modes": [
+    "knockout"
+   ]
   },
   {
    "id": "warehouse_sq_01",
@@ -52,7 +66,14 @@
     3,
     4
    ],
-   "file": "data/map_warehouse_sq_01.json"
+   "file": "data/map_warehouse_sq_01.json",
+   "modes": [
+    "knockout",
+    "tdm",
+    "kc",
+    "dom",
+    "hp"
+   ]
   },
   {
    "id": "canal_sq_01",
@@ -64,7 +85,14 @@
     3,
     4
    ],
-   "file": "data/map_canal_sq_01.json"
+   "file": "data/map_canal_sq_01.json",
+   "modes": [
+    "knockout",
+    "tdm",
+    "kc",
+    "dom",
+    "hp"
+   ]
   },
   {
    "id": "factory_sq_01",
@@ -76,7 +104,55 @@
     4,
     4
    ],
-   "file": "data/map_factory_sq_01.json"
+   "file": "data/map_factory_sq_01.json",
+   "modes": [
+    "knockout",
+    "tdm",
+    "kc",
+    "dom",
+    "hp",
+    "hq"
+   ]
+  },
+  {
+   "id": "harbor_sq_01",
+   "name": "Havnen",
+   "size": "xl",
+   "width": 40,
+   "height": 28,
+   "players": [
+    4,
+    4
+   ],
+   "file": "data/map_harbor_sq_01.json",
+   "modes": [
+    "knockout",
+    "tdm",
+    "kc",
+    "dom",
+    "hp",
+    "hq"
+   ]
+  },
+  {
+   "id": "city_sq_01",
+   "name": "Byen",
+   "size": "xl",
+   "width": 48,
+   "height": 32,
+   "players": [
+    4,
+    4
+   ],
+   "file": "data/map_city_sq_01.json",
+   "modes": [
+    "knockout",
+    "tdm",
+    "kc",
+    "dom",
+    "hp",
+    "hq"
+   ]
   }
  ]
 }
