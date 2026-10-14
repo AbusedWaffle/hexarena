@@ -5,7 +5,7 @@ const { createWorld, addPlayer, step } = await import('../sim/world.js');
 const { createAI } = await import('../sim/ai.js');
 const rd = (f) => JSON.parse(fs.readFileSync(new URL('../data/' + f, import.meta.url)));
 const map = rd('map_' + (process.env.MAP || 'paintyard_sq_01') + '.json'), classes = rd('classes.square.json'), cfg = rd('ai.json');
-if (process.env.MODE) { classes._match.mode = process.env.MODE; classes._match.modeCfg = { timeSec: 240 }; }
+if (process.env.MODE) { classes._match.mode = process.env.MODE; classes._match.modeCfg = { ...(rd('modes.json').modes.find(m => m.id === process.env.MODE) || {}), timeSec: 240 }; }
 const N = Number(process.argv[2] ?? 40), diff = process.argv[3] ?? 'normal';
 const CL = ['Assault', 'Sniper', 'Engineer', 'Scout', 'Support'];
 const st = Object.fromEntries(CL.map(c => [c, { games: 0, wins: 0, kills: 0, deaths: 0, dmg: 0, heal: 0 }]));

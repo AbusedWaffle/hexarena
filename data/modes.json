@@ -26,7 +26,10 @@
     "medium",
     "large",
     "xl"
-   ]
+   ],
+   "respawnSecByClass": {
+    "Scout": 2
+   }
   },
   {
    "id": "kc",
@@ -40,7 +43,11 @@
     "medium",
     "large",
     "xl"
-   ]
+   ],
+   "respawnSecByClass": {
+    "Scout": 2
+   },
+   "scoutTagDash": true
   },
   {
    "id": "dom",
