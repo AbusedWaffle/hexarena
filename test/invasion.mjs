@@ -15,9 +15,10 @@ for (const team of ['blue', 'red']) for (let i = 0; i < 20; i++) ai.addBot(addPl
 startMatch(w);
 const lp = createLoopbackPair({ lossU: 0.05, rnd, schedule }), host = createHostSession(w, lp.host, { ai });
 const clients = ['Scout', 'Assault'].map((c, i) => { const t = lp.addClient('c' + i); const s = createClientSession(t, { map, classes, cls: c }); t.connect(); return { t, s }; });
-const errs = new Set(); let maxB = 0, n = 0, sum = 0, ms = 0, steps = 0, seenMax = 0;
+const errs = new Set(); let radMax = 0, maxB = 0, n = 0, sum = 0, ms = 0, steps = 0, seenMax = 0;
 const send0 = lp.host.send.bind(lp.host);
-lp.host.send = (k, ch, m) => { if (ch === 'u' && m.t === 's') { const b = JSON.stringify(m).length; maxB = Math.max(maxB, b); sum += b; n++; } send0(k, ch, m); };
+lp.host.send = (k, ch, m) => { if (ch === 'u' && m.t === 'rad') radMax = Math.max(radMax, JSON.stringify(m).length);
+  if (ch === 'u' && m.t === 's') { const b = JSON.stringify(m).length; maxB = Math.max(maxB, b); sum += b; n++; } send0(k, ch, m); };
 while (!w.match.over && tick < 20 * 130) {
   tick++; for (const q of queue.splice(0)) if (q.at <= tick) q.fn(); else queue.push(q);
   clients.forEach((c, i) => { if (c.s.you) c.s.sendInput({ move: { x: Math.cos(tick / 30 + i), y: Math.sin(tick / 30 + i) }, aim: null, fire: rnd() < 0.2, ability: false, seq: tick }); });
@@ -28,8 +29,10 @@ while (!w.match.over && tick < 20 * 130) {
     const hp = w.players.find(p => p.id === c.s.you); const near = w.players.filter(p => p !== hp && Math.abs(p.x - hp.x) < 3 * 48 && Math.abs(p.y - hp.y) < 2 * 48).length;
     if (v.players.length - 1 < Math.min(near, 13)) errs.add(`klient ${i} mangler nære spillere (${v.players.length - 1}/${near}, død=${!hp.alive})`); });
 }
+clients.forEach((c, i) => { const R = c.s.radar; if (!R || R.length < 30) errs.add(`klient ${i}: radar ${R?.length}`); });
+let radB = 0;
 if (w.players.length !== 40) errs.add(`${w.players.length} spillere, forventede 40`);
 if (!w.match.over) errs.add('kampen sluttede ikke'); if (w.match.score.blue + w.match.score.red === 0) errs.add('ingen drab-point');
 if (maxB >= 600) errs.add(`snapshot ${maxB} B`); if (!n) errs.add('ingen snapshots sendt');
-const out = { score: w.match.score, sec: tick / 20, maxBytes: maxB, avgBytes: Math.round(sum / (n || 1)), seenMax, msPerTick: +(ms / steps).toFixed(2), errors: [...errs] };
+const out = { score: w.match.score, sec: tick / 20, maxBytes: maxB, radarBytes: radMax, avgBytes: Math.round(sum / (n || 1)), seenMax, msPerTick: +(ms / steps).toFixed(2), errors: [...errs] };
 console.log(JSON.stringify(out)); process.exit(errs.size ? 1 : 0);

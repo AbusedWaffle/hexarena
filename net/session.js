@@ -79,6 +79,10 @@ export function createHostSession(world, transport, opts = {}) {
       if (snap.players.length > 10) for (const [key, id] of slots) { const p = world.players.find(q => q.id === id); if (!p) continue;
         transport.send(key, 'u', { t: 's', s: encodeSnap(snap, r, { id, x: p.x, y: p.y, rx: VIEW_RX_TILES * TILE_PX, ry: VIEW_RY_TILES * TILE_PX }) }); }
       else transport.broadcast('u', { t: 's', s: encodeSnap(snap, r) });
+      // radar (store kampe): grove positioner for alle 1×/s til minikort/tilskuer: a = [tileX, tileY] pr. roster-indeks, [-1,-1] = død
+      if (snap.players.length > 10 && snap.tick % 20 === 0) { const idx = new Map(r.map((x, i) => [x.id, i])), a = new Array(r.length * 2).fill(-1);
+        for (const p of snap.players) { const i = idx.get(p.id); if (i != null && p.alive) { a[i * 2] = Math.floor(p.x / TILE_PX); a[i * 2 + 1] = Math.floor(p.y / TILE_PX); } }
+        transport.broadcast('u', { t: 'rad', k: snap.tick, a }); }
       if (snap.events.length) transport.broadcast('r', { t: 'ev', k: snap.tick, e: snap.events.filter(e => !(e.type === 'shot' && !e.hitscan)).map(e => roundEvent(e)) });
     },
     roster, sendRoster,
@@ -94,7 +98,7 @@ export function createClientSession(transport, opts) {
   // Kassetilstand fra welcome; lægges på igen efter et baneskift (sen join midt i en kamp på en anden bane end standard).
   let welcomeTiles = null, welcomeMap = null;
   const applyTiles = () => { for (const [x, y, hp, maxHp] of welcomeTiles || []) { const t = world.tiles.get(x + ',' + y); if (!t) continue; t.type = hp > 0 ? 'crate' : 'floor'; t.hp = hp; t.maxHp = maxHp; } };
-  let you = null, roster = [], lastTick = -1, view = null, pending = [], eventQueue = [];
+  let radar = null, radarTick = -1, you = null, roster = [], lastTick = -1, view = null, pending = [], eventQueue = [];
   const remap = (id) => id === you ? 'me' : id === 'me' ? 'host' : id;
 
   function syncRoster(r) {
@@ -129,6 +133,8 @@ export function createClientSession(transport, opts) {
     else if (m.t === 'settings') opts.onSettings?.(m.settings, m.started);
     else if (m.t === 'ev') { for (const e0 of m.e) { const e = remapEvent(e0, remap); applyTileEvent(e); eventQueue.push(e);
       if (e.score) { world.match.score = { ...e.score }; if (view) view.match = { ...view.match, score: { ...e.score }, over: view.match.over || e.type === 'matchOver' }; } } }
+    else if (m.t === 'rad' && you) { if (m.k < radarTick) return; radarTick = m.k;
+      radar = roster.map((r, i) => ({ id: remap(r.id), team: r.team, cls: r.cls, alive: m.a[i * 2] >= 0, x: (m.a[i * 2] + 0.5) * TILE_PX, y: (m.a[i * 2 + 1] + 0.5) * TILE_PX })).filter(p => p.alive); }
     else if (m.t === 's' && you) {
       if (m.s.t <= lastTick) return; // unordnet kanal: smid forældede snapshots væk
       lastTick = m.s.t;
@@ -142,7 +148,8 @@ export function createClientSession(transport, opts) {
     }
   });
   return {
-    world, get you() { return you; }, applyTiles(mapId) { if (mapId === welcomeMap) applyTiles(); }, get ready() { return !!(you && view); },
+    world, get you() { return you; }, get radar() { return radar; }, // radar: [{id,team,cls,x,y}] levende spillere, ~1×/s, kun i store kampe (ellers null)
+ applyTiles(mapId) { if (mapId === welcomeMap) applyTiles(); }, get ready() { return !!(you && view); },
     setClass(cls) { transport.send('host', 'r', { t: 'cls', cls }); },
     sendInput(f) { // kaldes hvert lokalt tick (20 Hz) med egen InputFrame
       pending.push(f); if (pending.length > 60) pending.shift();
