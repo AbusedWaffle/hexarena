@@ -163,7 +163,9 @@ export function createAI(w, cfg, seed = 1) {
   }
 
   function goalFor(b, p) {
-    if (b.state === 'retreat') { // mod en levende Support på holdet, ellers mod egen spawn
+    if (b.state === 'retreat') { // først bag nærmeste dækning væk fra truslen, derefter mod en levende Support, ellers mod egen spawn
+      const th = b.target || b.mem;
+      if (th && hasLineOfSight(w, p, th)) { if (!b.coverTile || hasLineOfSight(w, center(b.coverTile), th)) b.coverTile = findCover(p, th); if (b.coverTile) return b.coverTile; }
       const sup = w.players.find(q => q.alive && q.team === p.team && q.id !== p.id && w.classes[q.cls].ability?.id === 'heal_zone');
       if (sup) return tileOf(sup); const sp = w.map.spawns[p.team]; return sp[b.slot % sp.length]; }
     if (b.state === 'cover' && b.coverTile) return b.coverTile;
@@ -228,13 +230,13 @@ export function createAI(w, cfg, seed = 1) {
     if (b.state !== 'engage') {
       const g = goalFor(b, p);
       if (g && (!b.pathGoal || g.x !== b.pathGoal.x || g.y !== b.pathGoal.y || b.pathVersion !== mapVersion || !b.path.length)) {
-        const th = b.state === 'approach' || (b.state === 'seek' && prof(p).coverApproach) ? (b.target || b.mem) : null, exp = cfg.exposureCost ?? 3, seen = new Map();
+        const th = b.state === 'approach' || b.state === 'retreat' || (b.state === 'seek' && prof(p).coverApproach) ? (b.target || b.mem) : null, exp = cfg.exposureCost ?? 3, seen = new Map();
         const cost = th ? (x, y) => { const k = key(x, y); if (!seen.has(k)) seen.set(k, hasLineOfSight(w, center({ x, y }), th) ? exp : 0); return seen.get(k); } : null;
         b.path = findPath(w, tileOf(p), g, 2000, cost) || findPath(w, tileOf(p), g) || []; b.pathGoal = g; b.pathVersion = mapVersion;
       }
     }
     // Strafe-retning skifter tilfældigt
-    if (now > b.strafeUntil) { b.strafe = R() < 0.5 ? -1 : 1; b.strafeUntil = now + (cfg.strafeMinSec ?? 0.8) + R() * ((cfg.strafeMaxSec ?? 1.5) - (cfg.strafeMinSec ?? 0.8)); }
+    if (now > b.strafeUntil) { b.strafe = R() < 0.5 ? -1 : 1; b.strafeAmt = R() < 0.2 ? 0 : 0.6 + R() * 0.8; b.strafeUntil = now + (cfg.strafeMinSec ?? 0.8) + R() * ((cfg.strafeMaxSec ?? 1.5) - (cfg.strafeMinSec ?? 0.8)); }
     b.aimErr = (R() * 2 - 1) * b.diff.aimErrorDeg * Math.PI / 180;
     // Fastlåst? (bevæget < 0,3 tile det seneste sekund)
     if (b.lastPos && dist(b.lastPos, p) < 0.3 * U * thinkEvery / 20) { b.stuckT += thinkEvery * DT; } else b.stuckT = 0;
@@ -246,7 +248,7 @@ export function createAI(w, cfg, seed = 1) {
     while (b.path.length && dist(p, center(b.path[0])) < 0.35 * U) b.path.shift();
     if (!b.path.length) return { x: 0, y: 0 };
     // Glatning: sigt mod det fjerneste waypoint, der kan gås lige til
-    let i = 0; for (let j = Math.min(b.path.length - 1, 6); j > 0; j--) if (clearWalk(w, p, center(b.path[j]), p.radius * 0.95)) { i = j; break; }
+    let i = 0; for (let j = Math.min(b.path.length - 1, 10); j > 0; j--) if (clearWalk(w, p, center(b.path[j]), p.radius * 0.95)) { i = j; break; }
     return norm({ x: center(b.path[i]).x - p.x, y: center(b.path[i]).y - p.y });
   }
 
@@ -257,7 +259,7 @@ export function createAI(w, cfg, seed = 1) {
       const d = dist(p, t), pref = wp.range * U * (prof(p).preferredRangeFrac ?? cfg.preferredRangeFrac ?? 0.6), to = norm({ x: t.x - p.x, y: t.y - p.y });
       // Hysterese: skift kun frem/tilbage, når afstanden er tydeligt forkert, så botten ikke vipper på grænsen
       if (d > pref * 1.3) b.radial = b.noChase ? 0 : 1; else if (d < pref * 0.6) b.radial = -1; else if (b.radial === 1 ? d < pref * 1.0 : b.radial === -1 ? d > pref * 0.85 : false) b.radial = 0;
-      const radial = b.radial ?? 0, sa = cfg.strafeAmount ?? 0.6;
+      const radial = b.radial ?? 0, sa = (cfg.strafeAmount ?? 0.6) * (b.strafeAmt ?? 1);
       let mv = { x: to.x * radial - to.y * b.strafe * sa, y: to.y * radial + to.x * b.strafe * sa };
       // undgå at strafe ind i en væg
       const probe = { x: p.x + norm(mv).x * U, y: p.y + norm(mv).y * U }, pt = w.tiles.get(key(Math.floor(probe.x / U), Math.floor(probe.y / U)));
@@ -284,6 +286,7 @@ export function createAI(w, cfg, seed = 1) {
         if ((b.state === 'retreat' || b.state === 'approach') && p.charges > 0 && dist(p, b.target) <= wp.range * U * Math.min(0.9, prof(p).fireRangeFrac ?? 0.9) && b.seenSince != null && (now - b.seenSince) * 1000 >= b.diff.reactionMs) f.fire = true;
       } else if (Math.hypot(f.move.x, f.move.y) > 0) f.aim = { ...f.move };
     }
+    f.move = separate(p, f.move);
     f.move = smoothMove(b, f.move);
     if (!t && b.state !== 'engage' && Math.hypot(f.move.x, f.move.y) > 0.2 && !b.target && !(b.state === 'hold' && b.mem)) f.aim = norm(f.move);
     // Når botten bare går (ikke kæmper eller skyder), sendes intet sigte, så figuren vender i gåretningen ligesom en spiller
@@ -294,6 +297,13 @@ export function createAI(w, cfg, seed = 1) {
     return f;
   }
 
+  // Hold afstand til holdkammerater (skub væk inden for sepTiles), så de ikke klumper sig på én linje
+  function separate(p, mv) {
+    const r = (cfg.sepTiles ?? 1.6) * U; let sx = 0, sy = 0;
+    for (const q of w.players) if (q !== p && q.alive && q.team === p.team) { const d = dist(p, q); if (d < r && d > 1) { const k = (1 - d / r) * (cfg.sepStrength ?? 0.8); sx += (p.x - q.x) / d * k; sy += (p.y - q.y) / d * k; } }
+    if (!sx && !sy) return mv;
+    const m = { x: mv.x + sx, y: mv.y + sy }, l = Math.hypot(m.x, m.y); return l > 1 ? { x: m.x / l, y: m.y / l } : m;
+  }
   // Blød bevægelse: drej højst maxTurnDegPerSec og accelerér/brems over et par ticks i stedet for at vende på et tick
   function smoothMove(b, want) {
     const prev = b.move || { x: 0, y: 0 }, pl = Math.hypot(prev.x, prev.y), wl = Math.min(1, Math.hypot(want.x, want.y)), k = cfg.moveAccel ?? 0.35;

@@ -1,73 +1,77 @@
 {
-  "_note": "AI-sværhedsgrader. reactionMs = tid fra en fjende bliver synlig til første skud. aimErrorDeg = max sigtefejl. leadTarget 0..1 = hvor meget der sigtes foran et mål i bevægelse. coverBias 0..1 = sandsynlighed for at søge cover, når den er tom for ladninger eller såret. flankChance = sandsynlighed for at gå udenom i stedet for direkte på. thinkHz = beslutninger pr. sekund (bevægelse/sigte opdateres hvert tick).",
-  "thinkHz": 5,
-  "retreatHpFrac": 0.3,
-  "coverHpFrac": 0.55,
-  "preferredRangeFrac": 0.6,
-  "memorySec": 3,
-  "easy": {
-    "reactionMs": 600,
-    "aimErrorDeg": 14,
-    "leadTarget": 0.0,
-    "coverBias": 0.2,
-    "flankChance": 0.0,
-    "aggression": 0,
-    "shareIntel": false,
-    "pushAfterSec": 30
+ "_note": "AI-sværhedsgrader. reactionMs = tid fra en fjende bliver synlig til første skud. aimErrorDeg = max sigtefejl. leadTarget 0..1 = hvor meget der sigtes foran et mål i bevægelse. coverBias 0..1 = sandsynlighed for at søge cover, når den er tom for ladninger eller såret. flankChance = sandsynlighed for at gå udenom i stedet for direkte på. thinkHz = beslutninger pr. sekund (bevægelse/sigte opdateres hvert tick).",
+ "thinkHz": 5,
+ "retreatHpFrac": 0.3,
+ "coverHpFrac": 0.55,
+ "preferredRangeFrac": 0.6,
+ "memorySec": 3,
+ "easy": {
+  "reactionMs": 600,
+  "aimErrorDeg": 14,
+  "leadTarget": 0.0,
+  "coverBias": 0.2,
+  "flankChance": 0.0,
+  "aggression": 0,
+  "shareIntel": false,
+  "pushAfterSec": 30
+ },
+ "normal": {
+  "reactionMs": 350,
+  "aimErrorDeg": 8,
+  "leadTarget": 0.5,
+  "coverBias": 0.5,
+  "flankChance": 0.2,
+  "aggression": 1,
+  "shareIntel": false,
+  "pushAfterSec": 15
+ },
+ "hard": {
+  "reactionMs": 200,
+  "aimErrorDeg": 4,
+  "leadTarget": 1.0,
+  "coverBias": 0.8,
+  "flankChance": 0.4,
+  "aggression": 2,
+  "shareIntel": true,
+  "pushAfterSec": 10
+ },
+ "retreatMaxSec": 4,
+ "coverMaxSec": 4,
+ "_classNote": "Klasseprofiler: flankBonus lægges til sværhedsgradens flankChance. coverApproach = nærmer sig via stier, der undgår målets synslinje, når målet er uden for egen rækkevidde. preferredRangeFrac overstyrer den globale. fireRangeFrac = skyd først, når målet er inden for denne andel af våbnets rækkevidde (hagl spreder meget på lang afstand).",
+ "classes": {
+  "Assault": {
+   "preferredRangeFrac": 0.5
   },
-  "normal": {
-    "reactionMs": 350,
-    "aimErrorDeg": 8,
-    "leadTarget": 0.5,
-    "coverBias": 0.5,
-    "flankChance": 0.2,
-    "aggression": 1,
-    "shareIntel": false,
-    "pushAfterSec": 15
+  "Sniper": {
+   "preferredRangeFrac": 0.8
   },
-  "hard": {
-    "reactionMs": 200,
-    "aimErrorDeg": 4,
-    "leadTarget": 1.0,
-    "coverBias": 0.8,
-    "flankChance": 0.4,
-    "aggression": 2,
-    "shareIntel": true,
-    "pushAfterSec": 10
+  "Engineer": {
+   "flankBonus": 0.35,
+   "coverApproach": true,
+   "preferredRangeFrac": 0.35,
+   "fireRangeFrac": 0.5
   },
-  "retreatMaxSec": 4,
-  "coverMaxSec": 4,
-  "_classNote": "Klasseprofiler: flankBonus lægges til sværhedsgradens flankChance. coverApproach = nærmer sig via stier, der undgår målets synslinje, når målet er uden for egen rækkevidde. preferredRangeFrac overstyrer den globale. fireRangeFrac = skyd først, når målet er inden for denne andel af våbnets rækkevidde (hagl spreder meget på lang afstand).",
-  "classes": {
-    "Assault": {},
-    "Sniper": {
-      "preferredRangeFrac": 0.8
-    },
-    "Engineer": {
-      "flankBonus": 0.35,
-      "coverApproach": true,
-      "preferredRangeFrac": 0.35,
-      "fireRangeFrac": 0.5
-    },
-    "Scout": {
-      "flankBonus": 0.3,
-      "coverApproach": true,
-      "preferredRangeFrac": 0.45,
-      "fireRangeFrac": 0.75
-    },
-    "Support": {
-      "flankBonus": 0.1
-    }
+  "Scout": {
+   "flankBonus": 0.3,
+   "coverApproach": true,
+   "preferredRangeFrac": 0.45,
+   "fireRangeFrac": 0.75
   },
-  "exposureCost": 3,
-  "strafeMinSec": 0.8,
-  "strafeMaxSec": 1.5,
-  "strafeAmount": 0.6,
-  "maxTurnDegPerSec": 360,
-  "moveAccel": 0.35,
-  "_moveNote": "Bevægelse: strafe skifter retning hvert strafeMinSec–strafeMaxSec s. maxTurnDegPerSec begrænser hvor hurtigt botten kan dreje, og moveAccel (0..1 pr. tick) styrer acceleration/opbremsning.",
-  "maxBotsPerTarget": 2,
-  "hearingRange": 9,
-  "holdRadius": 6,
-  "_tacticsNote": "Taktik: bots jager kun fjender, de har set, hørt skyde (hearingRange tiles) eller er blevet ramt af, inden for memorySec. Ellers holder de deres post (rolle + lane). maxBotsPerTarget = højst så mange bots jager samme mål. holdRadius = Easy forlader kun posten for fjender inden for så mange tiles. aggression 0 = venter, 1 = presser ved lige antal eller overtal, 2 = presser og koordinerer to-sidede angreb. shareIntel = holdet deler hvad de ser. pushAfterSec = uden kontakt så længe rykker botten frem ad sin lane."
+  "Support": {
+   "flankBonus": 0.1
+  }
+ },
+ "exposureCost": 3,
+ "strafeMinSec": 0.8,
+ "strafeMaxSec": 1.5,
+ "strafeAmount": 0.6,
+ "maxTurnDegPerSec": 360,
+ "moveAccel": 0.35,
+ "_moveNote": "Bevægelse: strafe skifter retning hvert strafeMinSec–strafeMaxSec s. maxTurnDegPerSec begrænser hvor hurtigt botten kan dreje, og moveAccel (0..1 pr. tick) styrer acceleration/opbremsning. sepTiles/sepStrength: botter skubber sig væk fra holdkammerater inden for 1,6 tiles (0.3 holder bevægelsen rolig).",
+ "maxBotsPerTarget": 2,
+ "hearingRange": 9,
+ "holdRadius": 6,
+ "_tacticsNote": "Taktik: bots jager kun fjender, de har set, hørt skyde (hearingRange tiles) eller er blevet ramt af, inden for memorySec. Ellers holder de deres post (rolle + lane). maxBotsPerTarget = højst så mange bots jager samme mål. holdRadius = Easy forlader kun posten for fjender inden for så mange tiles. aggression 0 = venter, 1 = presser ved lige antal eller overtal, 2 = presser og koordinerer to-sidede angreb. shareIntel = holdet deler hvad de ser. pushAfterSec = uden kontakt så længe rykker botten frem ad sin lane.",
+ "sepTiles": 1.6,
+ "sepStrength": 0.3
 }
