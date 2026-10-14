@@ -54,7 +54,7 @@
   "radius": 0.4
  },
  "Engineer": {
-  "hp": 140,
+  "hp": 150,
   "speed": 2.6,
   "shape": "engineer",
   "weapon": {
@@ -63,7 +63,7 @@
    "rechargeSec": 1.5,
    "shotsPerCharge": 1,
    "shotIntervalMs": 0,
-   "fireCooldownSec": 0.8,
+   "fireCooldownSec": 0.7,
    "range": 8,
    "projectileSpeed": 24.0,
    "pellets": 5,
