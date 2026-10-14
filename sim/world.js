@@ -18,11 +18,13 @@ export function setMap(w, map) {
   w.map = map; w.tiles = buildTiles(map, w.classes); w.projectiles.length = 0; w.grenades.length = 0; w.zones.length = 0;
   for (const p of w.players) { p.deployedCrate = null; spawn(w, p); }
   w.mapVersion = (w.mapVersion || 0) + 1;
+  if (w.match.mode !== 'knockout') initMode(w); // objektiver følger banen
 }
 export function createWorld(map, classes) {
   const tiles = buildTiles(map, classes);
-  return { map, classes, tiles, players: [], projectiles: [], grenades: [], zones: [], events: [], tick: 0,
+  const w = { map, classes, tiles, players: [], projectiles: [], grenades: [], zones: [], events: [], tick: 0,
     match: newMatch(classes._match), nextId: 1 };
+  if (w.match.mode !== 'knockout') initMode(w); return w;
 }
 // Kamp-tilstand. knockout: runder uden respawn, først til roundsToWin. tdm: respawn, først til killTarget eller tiden.
 function newMatch(m) {

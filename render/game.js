@@ -26,6 +26,8 @@ addEventListener('hexarena:lobby-start', () => { globalThis.__lobbyStarted = tru
 // ?lobby=1: også spil mod robotter starter i lobbyen (menuen sætter det). Uden den starter et lokalt spil straks, som testlinks forventer.
 const LOBBY = QS.has('host') || QS.has('lobby');
 const ROOM = (QS.get('room') || '').toUpperCase(), MODE = ROOM ? 'client' : QS.has('host') ? 'host' : 'local';
+// ?mode=dom (uden lobby): lokal kamp starter direkte i tilstanden; i lobbyen er det startværdi for settings.mode
+if (MODE_DEFAULTS[QS.get('mode')]) classes._match.mode = QS.get('mode');
 const MY_CLS = classes[QS.get('cls')] ? QS.get('cls') : 'Assault';
 // Kamera-tal: synsfelt i tiles, følge-blødhed (andel pr. frame ved 60 fps; 0,15 ≈ 0,1 s forsinkelse) og fremskydning under manuel sigte
 const CAMERA = { tilesW: 14, tilesH: 8, lerp: 0.15, aimLeadTiles: 1.5 };
