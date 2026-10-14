@@ -207,7 +207,7 @@ export function createAI(w, cfg, seed = 1) {
     const m = w.match;
     if (m.mode === 'kc') { const t = nearest(p, (m.tags || []).filter(t => dist(p, t) <= (cfg.tagSeekTiles ?? 14) * U)); return t ? tileOf(t) : null; }
     const z = objZone(b, p); if (!z) return null;
-    if (b.role === 'sniper') { const c = zoneC(z), d = towardCenter(p.team); return postNear(c.x / U - d * (cfg.sniperZoneOffset ?? 6), c.y / U); } // Sniper dækker zonen på afstand
+    if (b.role === 'sniper') { const ex = towardCenter(p.team) > 0 ? z.x : z.x + z.w - 1, ey = z.y + Math.floor(z.h / 2); return freeTile(ex, ey) ? { x: ex, y: ey } : zoneTile(b, z); } // Sniper står i zonens kant mod egen side, så den tæller med i indtagelsen
     return zoneTile(b, z);
   }
   const prof = (p) => (cfg.classes && cfg.classes[p.cls]) || {};
@@ -289,7 +289,7 @@ export function createAI(w, cfg, seed = 1) {
       if (!pt || isBlocking(pt)) { b.strafe *= -1; b.strafeUntil = now + (cfg.strafeMinSec ?? 0.8); mv = { x: to.x * radial, y: to.y * radial }; }
       f.move = norm(mv); if (!mv.x && !mv.y) f.move = { x: 0, y: 0 };
       // Zone-tilstande: kæmp fra zonen; træk mod zonen, hvis kampen har trukket botten ud
-      if (objMode() && b.role !== 'sniper' && b.objZ) { const zc = zoneC(b.objZ), dz = dist(p, zc); if (dz > (b.objZ.w / 2 + 0.5) * U) { const tz = norm({ x: zc.x - p.x, y: zc.y - p.y }), k = Math.min(1, dz / (4 * U)) * (cfg.zonePull ?? 0.8); f.move = norm({ x: f.move.x * (1 - k) + tz.x * k, y: f.move.y * (1 - k) + tz.y * k }); } }
+      if (objMode() && b.objZ) { const zc = zoneC(b.objZ), dz = dist(p, zc); if (dz > (b.objZ.w / 2 + 0.5) * U) { const tz = norm({ x: zc.x - p.x, y: zc.y - p.y }), k = Math.min(1, dz / (4 * U)) * (cfg.zonePull ?? 0.8); f.move = norm({ x: f.move.x * (1 - k) + tz.x * k, y: f.move.y * (1 - k) + tz.y * k }); } }
       // Sigte: lead på projektiler + sigtefejl
       let ax = t.x, ay = t.y;
       const prev = b.prevT && b.prevT.id === t.id ? b.prevT : null;
@@ -359,6 +359,9 @@ export function createAI(w, cfg, seed = 1) {
         if (b.state === 'engage' && reacted && p.charges > 0 && p.focusLeft === 0 && t.hp > w.classes[p.cls].weapon.damage) use();
         return;
       case 'dash': {
+        const m = w.match; // Kill Confirmed + scoutTagDash: dash gennem en brik inden for rækkevidde
+        if (m.mode === 'kc' && m.cfg?.scoutTagDash && p.cls === 'Scout' && hpf > 0.3) { const tg = nearest(p, (m.tags || []).filter(q => dist(p, q) <= ab.distance * U * 0.9 && dist(p, q) > U && clearWalk(w, p, q, p.radius * 0.9)));
+          if (tg) { use(null, norm({ x: tg.x - p.x, y: tg.y - p.y })); return; } }
         const threat = t || b.mem; if (!threat) return;
         const away = norm({ x: p.x - threat.x, y: p.y - threat.y }), d = dist(p, threat), rng = w.classes[p.cls].weapon.range * U;
         if (hpf < 0.4 && d < rng) use(null, away);                                           // flygt
