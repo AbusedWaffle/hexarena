@@ -3,13 +3,14 @@
 // Hardpoint/Headquarters bruger én aktiv zone ad gangen (rækkefølgen i listen). Klienten regner samme layout ud fra banen.
 import { TILE_PX as U } from './grid.js';
 
-export const MODE_IDS = ['tdm', 'knockout', 'kc', 'dom', 'hp', 'hq']; // indeks bruges i codec (0/1 = gammelt format)
+export const MODE_IDS = ['tdm', 'knockout', 'kc', 'dom', 'hp', 'hq', 'invasion']; // indeks bruges i codec (0/1 = gammelt format)
 export const MODE_DEFAULTS = {
   knockout: {},
   tdm: { scoreTarget: 30, timeSec: 480, respawnSec: 3 },
   kc: { scoreTarget: 30, timeSec: 480, respawnSec: 3, tagLifeSec: 30 }, // scoutTagDash / respawnSecByClass kommer fra data/modes.json
   dom: { scoreTarget: 200, timeSec: 600, respawnSec: 3, capSec: 5 },
   hp: { scoreTarget: 150, timeSec: 600, respawnSec: 3, capSec: 0, rotateSec: 60 },
+  invasion: { scoreTarget: 100, timeSec: 900, respawnSec: 4, teamSize: 20 }, // som tdm, 20 mod 20 på Slagmarken; bots fylder op
   hq: { scoreTarget: 200, timeSec: 600, respawnSec: 3, capSec: 6, moveDelaySec: 5 },
 };
 export const isObjMode = (mode) => mode === 'dom' || mode === 'hp' || mode === 'hq';
@@ -81,7 +82,7 @@ export function stepMode(w, DT) {
 // Ved drab: tdm tæller drab; kc lægger en brik; de andre tilstande giver ikke point for drab.
 export function onKillMode(w, victim, killerTeam) {
   const m = w.match;
-  if (m.mode === 'tdm') m.score[killerTeam]++;
+  if (m.mode === 'tdm' || m.mode === 'invasion') m.score[killerTeam]++;
   else if (m.mode === 'kc') m.tags.push({ id: m.tagSeq++, x: victim.x, y: victim.y, team: victim.team, left: m.cfg.tagLifeSec ?? 30 });
 }
 // Kill Confirmed + scoutTagDash: Scout's dash samler brikker på hele strækningen (score/nægt som ved almindelig opsamling)

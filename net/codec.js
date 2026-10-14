@@ -3,15 +3,21 @@
 import { MODE_IDS, layoutObjectives } from '../sim/modes.js';
 const q10 = (v) => Math.round(v * 10), deg = (a) => a ? (Math.round(Math.atan2(a.y, a.x) * 180 / Math.PI) + 360) % 360 : 0;
 // players: [x, y, aimDeg*360 + facingDeg, hp, alive, charges*100 + chargeProgress%, lastSeq, abilityCD*10, shield*10, invuln*10, focus*10, respawn*10] (afsluttende nuller udelades)
-export function encodeSnap(snap, roster) {
+// view = { x, y, rx, ry } (px): kun spillere/skud/granater/zoner/brikker inden for kameraets område (+margen) sendes; p bliver tæt med indeks-liste pi.
+const inView = (v, o) => !v || (Math.abs(o.x - v.x) <= v.rx && Math.abs(o.y - v.y) <= v.ry);
+// i store slagsmål: de nærmeste (egen spiller altid med)
+const nearest = (v, arr, n) => arr.length <= n ? arr : arr.map(o => [o.id === v.id ? -1 : Math.hypot(o.x - v.x, o.y - v.y), o]).sort((a, b) => a[0] - b[0]).slice(0, n).map(x => x[1]);
+export function encodeSnap(snap0, roster, view = null) {
+  const snap = view ? { ...snap0, players: nearest(view, snap0.players.filter(p => p.id === view.id || inView(view, p)), view.maxPlayers ?? 14), projectiles: nearest(view, snap0.projectiles.filter(b => inView(view, b)), view.maxShots ?? 16),
+    grenades: (snap0.grenades || []).filter(g => inView(view, g)), zones: (snap0.zones || []).filter(z => inView(view, z)), tags: (snap0.tags || []).filter(t => inView(view, t)) } : snap0;
   const idx = new Map(roster.map((r, i) => [r.id, i]));
-  const P = [];
+  const P = [], PI = [];
   for (const p of snap.players) {
     const i = idx.get(p.id); if (i == null) continue;
     const arr = [Math.round(p.x), Math.round(p.y), deg(p.aim) * 360 + deg({ x: Math.cos(p.facing || 0), y: Math.sin(p.facing || 0) }), Math.ceil(p.hp), p.alive ? 1 : 0, p.charges * 100 + Math.min(99, Math.floor(p.chargeProgress * 100)), p.lastSeq | 0,
       q10(p.abilityCooldownLeft), q10(p.spawnShieldLeft), q10(p.invulnLeft || 0), q10(p.focusLeft || 0), q10(Math.min(99, Math.max(0, p.respawnLeft)))];
     while (arr.length > 7 && arr[arr.length - 1] === 0) arr.pop(); // nul-felter til sidst sendes ikke
-    P[i] = arr;
+    if (view) { PI.push(i); P.push(arr); } else P[i] = arr;
   }
   const tm = { blue: 0, red: 1 };
   const out = { t: snap.tick, m: [snap.match.score.blue, snap.match.score.red, q10(snap.match.timeLeft), snap.match.over ? 1 : 0, snap.match.round ?? 1, q10(snap.match.roundIntroLeft ?? 0), Math.max(0, MODE_IDS.indexOf(snap.match.mode))], p: P,
@@ -20,6 +26,7 @@ export function encodeSnap(snap, roster) {
     z: (snap.zones || []).map(z => [z.id, tm[z.team], Math.round(z.x), Math.round(z.y), Math.round(z.radius), q10(z.left)]) };
   // tilstande med respawn: m += [target, zoneSwap*10, respawnBlocked(0/1=blå/2=rød), aktiv zone]; o = [ejer, indtager, cap%] pr. objektiv (geometri regnes ud fra banen); k = brikker [id, x, y, hold]
   const M = snap.match, t3 = (t) => t === 'blue' ? 1 : t === 'red' ? 2 : 0;
+  if (view) out.pi = PI;
   if (M.mode !== 'knockout') out.m.push(M.target ?? 0, q10(M.zoneSwapLeft || 0), t3(M.respawnBlocked), M.active || 0);
   if (snap.objectives?.length) out.o = snap.objectives.flatMap(z => [t3(z.owner), t3(z.capTeam), Math.round(z.cap * 100)]);
   if (snap.tags?.length) out.k = snap.tags.flatMap(t => [t.id, Math.round(t.x), Math.round(t.y), tm[t.team]]);
@@ -30,7 +37,7 @@ const layoutCache = new Map();
 export function decodeSnap(m, roster, remap = (id) => id, map = null) {
   const teams = ['blue', 'red'], players = [];
   m.p.forEach((a, i) => {
-    const r = roster[i]; if (!a || !r) return; // roster kan være skiftet i lobbyen før næste roster-besked
+    const r = roster[m.pi ? m.pi[i] : i]; if (!a || !r) return; // roster kan være skiftet i lobbyen før næste roster-besked
     players.push({ id: remap(r.id), team: r.team, cls: r.cls, radius: r.radius, x: a[0], y: a[1], aim: { x: Math.cos(Math.floor(a[2] / 360) * Math.PI / 180), y: Math.sin(Math.floor(a[2] / 360) * Math.PI / 180) }, facing: (a[2] % 360) * Math.PI / 180,
       alive: !!a[4], hp: a[3], maxHp: r.maxHp, charges: Math.floor(a[5] / 100), chargeProgress: (a[5] % 100) / 100,
       lastSeq: a[6], abilityCooldownLeft: (a[7] ?? 0) / 10, spawnShieldLeft: (a[8] ?? 0) / 10, invulnLeft: (a[9] ?? 0) / 10, focusLeft: (a[10] ?? 0) / 10, respawnLeft: (a[11] ?? 0) / 10 });

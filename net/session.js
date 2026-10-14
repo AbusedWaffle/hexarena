@@ -1,6 +1,7 @@
 // Host- og klient-session oven på et Transport. Hosten kører step() og er autoritativ; klienten spejler state og forudsiger egen bevægelse.
 import { createWorld, addPlayer, setClass, predictMove, autoAimPick } from '../sim/world.js';
 import { TILE_PX } from '../sim/grid.js';
+const VIEW_RX_TILES = 8.5, VIEW_RY_TILES = 5; // kameraet viser ca. 14×8 tiles
 import { encodeSnap, decodeSnap, rosterOf, remapEvent } from './codec.js';
 
 const INPUT_REDUNDANCY = 3; // hvert input-pakke bærer de sidste 3 frames, så tabte pakker ikke taber skud
@@ -74,7 +75,10 @@ export function createHostSession(world, transport, opts = {}) {
     },
     publish(snap) { // efter step(): snapshot på 'u', events på 'r' (events må ikke gå tabt)
       const r = roster();
-      transport.broadcast('u', { t: 's', s: encodeSnap(snap, r) });
+      // store kampe (> 10 spillere, fx Invasion): hver klient får kun det, der er nær dens kamera (halv kamerabredde + margen), så snapshot < 600 B
+      if (snap.players.length > 10) for (const [key, id] of slots) { const p = world.players.find(q => q.id === id); if (!p) continue;
+        transport.send(key, 'u', { t: 's', s: encodeSnap(snap, r, { id, x: p.x, y: p.y, rx: VIEW_RX_TILES * TILE_PX, ry: VIEW_RY_TILES * TILE_PX }) }); }
+      else transport.broadcast('u', { t: 's', s: encodeSnap(snap, r) });
       if (snap.events.length) transport.broadcast('r', { t: 'ev', k: snap.tick, e: snap.events.filter(e => !(e.type === 'shot' && !e.hitscan)).map(e => roundEvent(e)) });
     },
     roster, sendRoster,

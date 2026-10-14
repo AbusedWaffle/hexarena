@@ -96,7 +96,8 @@ class Arena extends Phaser.Scene {
   applyLobbySettings(st, quiet = false) {
     if (this.started) return; if (st) this.settings = { ...this.settings, ...(st.botCount != null && !('botFill' in st) ? { botFill: false } : {}), ...st }; st = this.settings; if (!st) return;
     if (st.map && mapInfo(st.map) && st.map !== this.world.map.id) { this.swapMap(st.map).then(ok => ok && this.applyLobbySettings(null, quiet)); return; }
-    const w = this.world, mc = w.classes._match, size = Math.max(1, Math.min(4, st.teamSize | 0 || 3));
+    const w = this.world, mc = w.classes._match, big = st.mode === 'invasion', size = big ? Math.max(1, Math.min(20, (mc.modesData?.invasion?.teamSize ?? MODE_DEFAULTS.invasion.teamSize) | 0)) : Math.max(1, Math.min(4, st.teamSize | 0 || 3));
+    if (big) st = { ...st, bots: true, botFill: true }; // Invasion: bots fylder altid holdene op, mennesker tager en bots plads
     mc.maxPerTeam = size; if (st.roundsToWin) mc.roundsToWin = +st.roundsToWin; if (st.roundTimeSec) mc.roundTimeSec = +st.roundTimeSec;
     // spiltilstand: knockout (standard) | tdm | kc | dom | hp | hq; scoreTarget/timeSec/respawnSec overskriver MODE_DEFAULTS
     if (st.mode && MODE_DEFAULTS[st.mode]) { mc.mode = st.mode; mc.modeCfg = { ...(st.scoreTarget ? { scoreTarget: +st.scoreTarget } : {}), ...(st.timeSec ? { timeSec: +st.timeSec } : {}), ...(st.respawnSec ? { respawnSec: +st.respawnSec } : {}) }; }
