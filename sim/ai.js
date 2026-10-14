@@ -14,15 +14,18 @@ const norm = (v) => { const l = Math.hypot(v.x, v.y) || 1; return { x: v.x / l, 
 export function findPath(w, from, to, maxNodes = 2000, extraCost = null) {
   const goal = key(to.x, to.y); const t = w.tiles.get(goal); if (!t || isBlocking(t)) return null;
   const h = (x, y) => { const dx = Math.abs(x - to.x), dy = Math.abs(y - to.y); return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy); };
+  // binær heap på f (før: lineær søgning, langsom på store baner)
   const open = [{ x: from.x, y: from.y, g: 0, f: h(from.x, from.y) }], came = new Map(), g = new Map([[key(from.x, from.y), 0]]);
+  const push = (o) => { open.push(o); let i = open.length - 1; while (i > 0) { const pi = (i - 1) >> 1; if (open[pi].f <= o.f) break; open[i] = open[pi]; i = pi; } open[i] = o; };
+  const pop = () => { const top = open[0], last = open.pop(); if (open.length) { let i = 0; const n = open.length; for (;;) { let c = 2 * i + 1; if (c >= n) break; if (c + 1 < n && open[c + 1].f < open[c].f) c++; if (open[c].f >= last.f) break; open[i] = open[c]; i = c; } open[i] = last; } return top; };
   let n = 0;
-  while (open.length && n++ < maxNodes) {
-    let bi = 0; for (let i = 1; i < open.length; i++) if (open[i].f < open[bi].f) bi = i;
-    const cur = open.splice(bi, 1)[0], ck = key(cur.x, cur.y);
+  while (open.length && n < maxNodes) {
+    const cur = pop(), ck = key(cur.x, cur.y);
+    if (cur.g > (g.get(ck) ?? Infinity)) continue; n++;
     if (ck === goal) { const path = []; let k = ck; while (came.has(k)) { const [x, y] = k.split(',').map(Number); path.unshift({ x, y }); k = came.get(k); } return path; }
     for (const nb of neighbors(w, cur.x, cur.y)) {
       const nk = key(nb.x, nb.y), ng = cur.g + nb.cost + (extraCost ? extraCost(nb.x, nb.y) : 0);
-      if (ng < (g.get(nk) ?? Infinity)) { g.set(nk, ng); came.set(nk, ck); open.push({ x: nb.x, y: nb.y, g: ng, f: ng + h(nb.x, nb.y) }); }
+      if (ng < (g.get(nk) ?? Infinity)) { g.set(nk, ng); came.set(nk, ck); push({ x: nb.x, y: nb.y, g: ng, f: ng + h(nb.x, nb.y) }); }
     }
   }
   return null;
@@ -38,7 +41,7 @@ function clearWalk(w, a, b, r) {
 export function createAI(w, cfg, seed = 1) {
   const R = mulberry(seed), bots = new Map(), aiData = w.classes._ai || {};
   const visionPx = (aiData.visionRange ?? 16) * U, maxRetreat = aiData.maxRetreatingPerTeam ?? 1;
-  let mapVersion = 0, botIndex = 0;
+  let mapVersion = 0, botIndex = 0, pathBudget = 3;
   const thinkEvery = Math.max(1, Math.round(1 / DT / (cfg.thinkHz || 5)));
 
   function addBot(id, difficulty = 'normal') {
@@ -64,14 +67,18 @@ export function createAI(w, cfg, seed = 1) {
   const coverNear = (x, y) => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => !freeTile(x + dx, y + dy));
   // Nærmeste gangbare tile til et idealpunkt; tiles med cover ved siden af foretrækkes
   function postNear(ix, iy, wantCover = true) {
-    let best = null;
-    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (freeTile(x, y)) {
+    // søger i ringe ud fra idealpunktet og stopper, når ingen længere ring kan slå det bedste (før: hele banen pr. kald)
+    let best = null; const cx = Math.round(ix), cy = Math.round(iy), R = Math.max(W, H);
+    const tryT = (x, y) => { if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 || !freeTile(x, y)) return;
       const s = Math.hypot(x - ix, y - iy) + (wantCover && !coverNear(x, y) ? 1.5 : 0);
-      if (!best || s < best.s) best = { x, y, s };
+      if (!best || s < best.s || (s === best.s && (y < best.y || (y === best.y && x < best.x)))) best = { x, y, s }; };
+    for (let r = 0; r <= R; r++) {
+      if (best && r - 1 > best.s) break;
+      if (r === 0) { tryT(cx, cy); continue; }
+      for (let d = -r; d <= r; d++) { tryT(cx + d, cy - r); tryT(cx + d, cy + r); if (d > -r && d < r) { tryT(cx - r, cy + d); tryT(cx + r, cy + d); } }
     }
     return best && { x: best.x, y: best.y };
   }
-  // Sniper-post: i egen halvdel, den tile der ser flest felter i midten af banen
   function sniperPost(team) {
     if (sniperPostCache[team]) return sniperPostCache[team];
     const dir = towardCenter(team), x0 = sideX[team], samples = [];
@@ -252,7 +259,8 @@ export function createAI(w, cfg, seed = 1) {
     // Sti
     if (b.state !== 'engage') {
       const g = goalFor(b, p);
-      if (g && (!b.pathGoal || g.x !== b.pathGoal.x || g.y !== b.pathGoal.y || b.pathVersion !== mapVersion || !b.path.length)) {
+      const must = !b.path.length || !b.pathGoal || g && (g.x !== b.pathGoal.x || g.y !== b.pathGoal.y);
+      if (g && (must || b.pathVersion !== mapVersion) && (must ? pathBudget > 0 : pathBudget > (cfg.pathsPerTick ?? 3) - 1)) { pathBudget--; // budget pr. tick: kun ny bane-version venter ved travlhed
         const th = b.state === 'approach' || b.state === 'retreat' || (b.state === 'seek' && prof(p).coverApproach) ? (b.target || b.mem) : null, exp = cfg.exposureCost ?? 3, seen = new Map();
         const cost = th ? (x, y) => { const k = key(x, y); if (!seen.has(k)) seen.set(k, hasLineOfSight(w, center({ x, y }), th) ? exp : 0); return seen.get(k); } : null;
         b.path = findPath(w, tileOf(p), g, 2000, cost) || findPath(w, tileOf(p), g) || []; b.pathGoal = g; b.pathVersion = mapVersion;
@@ -388,7 +396,7 @@ export function createAI(w, cfg, seed = 1) {
       if (e.type === 'roundStart') { for (const b of bots.values()) resetBot(b); assignRoles(); } // ny runde: glem viden, mål og stier
     }
     for (const b of bots.values()) for (const k of ['post', 'pushPost']) if (b[k] && !freeTile(b[k].x, b[k].y)) b[k] = postNear(b[k].x, b[k].y); // kasse dukket op på posten: flyt til nærmeste frie felt
-    updateIntel();
+    updateIntel(); pathBudget = cfg.pathsPerTick ?? 3;
     const out = {};
     for (const b of bots.values()) {
       const p = w.players.find(q => q.id === b.id); if (!p) continue;
