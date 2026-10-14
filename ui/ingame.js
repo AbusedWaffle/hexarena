@@ -9,6 +9,8 @@ const CSS = `
 .hi-title{font-size:clamp(15px,4.6vh,24px);font-weight:700;letter-spacing:.25em;margin-bottom:clamp(4px,1.5vh,10px)}
 .hi-mi{all:unset;cursor:pointer;font-size:clamp(13px,4.2vh,19px);letter-spacing:.12em;padding:clamp(3px,1.1vh,7px) 12px;border-left:3px solid transparent;opacity:.8}
 .hi-mi:hover,.hi-mi.sel{opacity:1;border-left-color:#4FA3FF;background:linear-gradient(90deg,rgba(79,163,255,.4),rgba(79,163,255,0))}
+.hi-mi.danger{color:#FF8A8A}.hi-mi.danger:hover,.hi-mi.danger.sel{border-left-color:#FF5A5A;background:linear-gradient(90deg,rgba(255,90,90,.35),rgba(255,90,90,0))}
+.hi-q{font-size:clamp(12px,3.6vh,16px);margin:4px 12px 8px;opacity:.9}
 .hi-mi.warn:hover{border-left-color:#FF5A5A;background:linear-gradient(90deg,rgba(255,90,90,.35),rgba(255,90,90,0))}
 `;
 const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; };
@@ -18,6 +20,7 @@ const L = () => globalThis.__lobbyUI;
 const mode = () => L()?.mode() || (qs.has('host') ? 'host' : qs.has('room') ? 'client' : 'local');
 const over = () => !!globalThis.__arena?.cur?.match?.over;
 
+let shownOver = false;
 const btn = el('button', 'ha-btn hm-ingame', '≡'); btn.id = 'ingame-menu-btn'; btn.title = 'Menu';
 const wrap = el('div', 'hi-wrap'); wrap.id = 'ingame-menu'; wrap.hidden = true;
 document.body.append(btn, wrap);
@@ -35,13 +38,22 @@ function open() {
   if (L()) mi('INDSTILLINGER', 'im-settings', () => { close(); L().openPanel('settings'); });
   if (L() && mode() !== 'local' && L().code()) mi('VIS KODE', 'im-code', () => { close(); L().openPanel('code'); });
   if (L() && !over()) mi('TILBAGE TIL LOBBYEN', 'im-lobby', () => { close(); L().openLobby(); });
+  if (L() && mode() !== 'client' && globalThis.__lobbyStarted) mi('AFBRYD OG GÅ TIL LOBBY', 'im-reset', confirmReset, 'danger');
   mi(over() ? 'MENU' : 'FORLAD KAMPEN', 'im-leave', () => { location.href = location.pathname; }, 'warn');
   items[0].classList.add('sel');
   for (const b of items) b.onmouseenter = () => items.forEach(x => x.classList.toggle('sel', x === b));
   box.append(...items); wrap.append(box); wrap.hidden = false;
 }
+function confirmReset() {
+  wrap.replaceChildren();
+  const box = el('div', 'hi-box'); box.append(el('div', 'hi-title', 'AFBRYD'), el('div', 'hi-q', 'Afbryd kampen? Alle sendes tilbage til lobbyen.'));
+  const yes = el('button', 'hi-mi danger sel', 'JA, AFBRYD'); yes.id = 'im-reset-yes';
+  const no = el('button', 'hi-mi', 'NEJ'); no.id = 'im-reset-no';
+  yes.onclick = () => { close(); shownOver = false; globalThis.dispatchEvent(new CustomEvent('hexarena:lobby-reset')); L()?.resetStarted(); };
+  no.onclick = open;
+  box.append(yes, no); wrap.append(box);
+}
 btn.onclick = () => (wrap.hidden ? open() : close());
 wrap.onclick = (e) => { if (e.target === wrap) close(); };
-let shownOver = false;
-setInterval(() => { if (over() && !shownOver) { shownOver = true; if (!L()?.isOpen()) open(); } }, 500);
+setInterval(() => { if (!over()) shownOver = false; if (over() && !shownOver) { shownOver = true; if (!L()?.isOpen()) open(); } }, 500);
 globalThis.__ingameMenu = { open, close };

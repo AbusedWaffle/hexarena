@@ -339,14 +339,18 @@ globalThis.addEventListener('hexarena:lobby', (e) => {
   if (d.code) code = d.code;
   if (d.roster) roster = d.roster;
   if (d.settings && mode === 'client') { settings = normalize(d.settings.botFill ? { ...d.settings, botCount: 'fill' } : d.settings); globalThis.__lobbySettings = pub(settings); loadMapFile(); }
+  if (d.started === false && started) resetStarted();
   if (d.started && !started) { started = true; if (mode === 'client') { open = false; panel = null; } }
   if (d.status) { status = d.status; error = d.error || ''; if (status === 'error') open = true; }
   render();
 });
+// Kampen afbrudt (hexarena:lobby-reset → game.js sender started:false): tilbage til før start
+function resetStarted() { started = false; globalThis.__lobbyStarted = false; panelOnly = false; panel = null; open = true; }
 // API til in-game-menuen (ui/ingame.js)
 globalThis.__lobbyUI = {
   mode: () => mode, code: () => code, isOpen: () => open && !wrap.hidden,
   openLobby() { panelOnly = false; panel = null; open = true; render(); },
+  resetStarted() { resetStarted(); render(); },
   openPanel(p) { panelOnly = true; panel = p; open = true; render(); },
 };
 render();

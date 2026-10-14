@@ -41,6 +41,35 @@ for (const [w, h] of [[844, 390], [1280, 720]]) {
     if (mode === 'host') { await pg.tap('#ingame-menu-btn'); await pg.tap('#im-code'); await pg.waitForTimeout(150); ok.code = /^[A-Z0-9]{5}$/.test((await pg.textContent('#lobby-code')).trim()); await pg.$eval('#lobby-code-close', e => e.click()); }
     await pg.tap('#ingame-menu-btn'); await pg.tap('#im-lobby'); await pg.waitForTimeout(150);
     ok.lobby = !(await pg.$eval('#lobby', e => e.hidden)) && (await pg.textContent('#lobby-start')).includes('TILBAGE TIL KAMPEN');
+    // afbryd → lobby igen, indstillinger kan ændres, ny start
+    await pg.$eval('#lobby-start', e => e.click()); await pg.waitForTimeout(300);
+    await pg.evaluate(() => { globalThis.__starts = 0; addEventListener('hexarena:lobby-start', () => __starts++); });
+    await pg.tap('#ingame-menu-btn'); await pg.waitForTimeout(100);
+    ok.resetItem = !!(await pg.$('#im-reset'));
+    await pg.tap('#im-reset'); await pg.waitForTimeout(100);
+    ok.confirm = (await pg.textContent('#ingame-menu')).includes('Afbryd kampen? Alle sendes tilbage til lobbyen.');
+    await pg.tap('#im-reset-yes'); await pg.waitForTimeout(800);
+    ok.resetLobby = !(await pg.$eval('#lobby', e => e.hidden)) && (await pg.textContent('#lobby-start')).includes('START KAMPEN') && await pg.evaluate(() => !globalThis.__lobbyStarted);
+    await pg.$eval('#lobby-settings', e => e.click()); await pg.waitForTimeout(100);
+    ok.noRoNote = !(await pg.textContent('#lobby-settings-panel')).includes('KAN ÆNDRES') && !(await pg.$('#lobby-settings-panel .hl-set.ro'));
+    await pg.$eval('[data-k=roundTimeSec] [data-v="45"]', e => e.click()); await pg.waitForTimeout(100);
+    ok.settingChanged = await pg.evaluate(() => __lobbySettings.roundTimeSec === 45);
+    await pg.$eval('#lobby-panel-close', e => e.click());
+    const t0 = await pg.evaluate(() => __arena.world.tick);
+    await pg.$eval('#lobby-start', e => e.click()); await pg.waitForTimeout(1500);
+    ok.restart = await pg.evaluate((t0) => __starts === 1 && __lobbyStarted === true && __arena.world.tick > t0, t0);
+    // automatisk menu ved kampens slut
+    await pg.evaluate(() => { __arena.world.match.over = true; }); await pg.waitForTimeout(1200);
+    ok.endMenu = !(await pg.$eval('#ingame-menu', e => e.hidden)) && (await pg.textContent('#ingame-menu')).includes('KAMPEN ER SLUT') && !!(await pg.$('#im-again'));
+    if (w === 844) await pg.screenshot({ path: `${P}_${w}_${mode}_end.png` });
+    if (mode === 'host') {
+      const code = await pg.evaluate(() => __arena.code);
+      const cl = await ctx.newPage(); cl.on('pageerror', e => errs.push('klient: ' + e.message));
+      await cl.goto(`http://localhost:${PORT}/?room=${code}&net=bc&cls=Scout`); await cl.waitForTimeout(3000);
+      await cl.evaluate(() => __ingameMenu.open()); await cl.waitForTimeout(100);
+      ok.clientNoReset = !(await cl.$('#im-reset')) && !!(await cl.$('#im-continue'));
+      await cl.close();
+    }
     res[`${w}_${mode}`] = ok; await pg.close();
   }
   await ctx.close();
