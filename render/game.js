@@ -2,6 +2,7 @@ import { MODE_DEFAULTS } from '../sim/modes.js';
 import { PALETTE, FX } from '../art/palette.js';
 import { drawUnit } from '../art/shapes.js';
 import { AbilityFx } from '../art/abilityFx.js';
+import { ModeFx } from '../art/modeFx.js';
 import { TILE_PX } from '../sim/grid.js';
 import { drawSquareMap } from '../art/squareMap.js';
 import { createWorld, setMap, addPlayer, step, snapshot, raycast, DT, setClass, setTeam, startMatch } from '../sim/world.js';
@@ -69,7 +70,7 @@ class Arena extends Phaser.Scene {
     }
     this.prev = this.cur = MODE === 'client' ? null : snapshot(this.world); this.acc = 0;
     this.staticG = this.add.graphics(); this.drawMap();
-    this.g = this.add.graphics(); this.fxG = this.add.graphics(); this.ghosts = new Map(); this.pops = []; this.abilityFx = new AbilityFx(this);
+    this.g = this.add.graphics(); this.fxG = this.add.graphics(); this.ghosts = new Map(); this.pops = []; this.abilityFx = new AbilityFx(this); this.modeFx = new ModeFx(this);
     this.camTarget = this.add.zone(this.me.x, this.me.y, 1, 1);
     // Kamera som i Brawl Stars: egen spiller altid i midten, ingen banegrænser (uden for banen ses baggrunden),
     // zoom så man ser ca. CAMERA.tilesW × CAMERA.tilesH tiles, og blød følge.
@@ -202,7 +203,7 @@ class Arena extends Phaser.Scene {
     globalThis.dispatchEvent(new CustomEvent('hexarena:spectate', { detail: globalThis.__spectate || { id: null } }));
   }
   draw(alpha) {
-    const g = this.g, now = this.time.now; g.clear(); this.fxG.clear();
+    const g = this.g, now = this.time.now; g.clear(); this.fxG.clear(); this.modeFx.draw(g, now, this.cur);
     const lerp = (a, b) => a + (b - a) * alpha;
     const specId = this.updateSpectate(now);
     for (const p of this.cur.players) {

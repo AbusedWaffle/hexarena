@@ -17,6 +17,10 @@ for e in idx['maps']:
             if c=='#': d.rectangle(r,fill=H(P['wall']),outline=H(P['we']))
             elif c=='x': d.rectangle(r,fill=H(fl),outline=H(P['line'])); d.rectangle((r[0]+1,r[1]+1,r[2]-1,r[3]-1),fill=H(P['crate']),outline=H(P['ce']))
             else: d.rectangle(r,fill=H(fl),outline=H(P['line']))
+    for zn in m.get('zones',[]):
+        r=(o+zn['x']*T,o+zn['y']*T,o+(zn['x']+zn['w'])*T-1,o+(zn['y']+zn['h'])*T-1)
+        d.rectangle(r,outline='#C9D0E6',width=2)
+        d.text(((r[0]+r[2])/2-3,(r[1]+r[3])/2-5),str(zn['id']),fill='#C9D0E6')
     for t in('blue','red'):
         for s in m['spawns'].get(t,[]):
             cx,cy=o+s['x']*T+T/2,o+s['y']*T+T/2; q=T*0.3
