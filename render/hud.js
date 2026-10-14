@@ -7,7 +7,7 @@ import { hasLineOfSight } from '../sim/world.js';
 const hexStr = (c) => '#' + c.toString(16).padStart(6, '0');
 export const HUD = { mini: { tile: 5, margin: 16 } /* tile skaleres ned på store baner (max 150×100 px) */, arrow: { inset: 26, size: 11 } };
 
-export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
+export function createHud(scene, { map, classes, world, input, meId = 'me', miniPlayers = null }) {
   const g = scene.add.graphics().setDepth(20);
   const font = 'Roboto Mono, monospace';
   const scoreB = scene.add.text(560, 14, '', { fontFamily: font, fontSize: 34, color: hexStr(PALETTE.blue), fontStyle: 'bold' }).setOrigin(1, 0).setDepth(21);
@@ -25,7 +25,12 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
   const layer = scene.add.container(0, 0, [g, scoreB, scoreR, clock, center, abilTxt, modeTxt, blockTxt]).setScrollFactor(0).setDepth(20);
   const fitLayer = () => { const z = scene.cameras.main.zoom; layer.setScale(1 / z).setPosition(640 - 640 / z, 360 - 360 / z); };
   const toScreen = (wx, wy) => { const c = scene.cameras.main, v = c.worldView; return { x: (wx - v.x) * c.zoom, y: (wy - v.y) * c.zoom }; };
-  const M = HUD.mini; let mw, mh, mx0, my0; // følger world.map, så baneskift i lobbyen også skifter minikort
+  const M = HUD.mini; let mw, mh, mx0, my0, miniKey = '', miniStaticAt = 0, miniDynAt = -1e9, miniDots = 0;
+  // Minikortets kilde er udskiftelig: standard = klientens grove radar-positioner (net/session.js `radar`, ~1 Hz, alle spillere
+  // i store kampe) flettet med snapshot-spillerne (præcise, men kun dem nær kameraet); uden radar bruges snapshot alene.
+  let miniSrc = miniPlayers || ((snap) => { const rad = scene.client?.radar; if (!rad) return snap.players;
+    const near = new Map(snap.players.map(p => [p.id, p])); return [...snap.players, ...rad.filter(p => !near.has(p.id))]; });
+  const ms = scene.add.graphics(), md = scene.add.graphics(); layer.addAt(ms, 1); layer.addAt(md, 2); // følger world.map, så baneskift i lobbyen også skifter minikort
   const isTouch = scene.sys.game.device.input.touch;
   let lastRoundMsg = null;
   const tagFx = [], tagTxt = [], TAG = { flyMs: 260, popMs: 160, toastMs: 900 };
@@ -48,8 +53,9 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
     // læg et ekstra objekt (fx hjælpetekst) i HUD-laget
     add(obj) { layer.add(obj); return obj; },
     toScreen,
+    setMiniSource(fn) { miniSrc = fn; },
     // til tests: synlige tilstandstekster
-    modeTexts: () => ({ center: center.text, toasts: tagTxt.filter(Boolean).map(t => t.text).filter(Boolean), tagFx: tagFx.length, mode: modeTxt.text, block: blockTxt.text, labels: objTxt.filter(Boolean).map(t => t.text).filter(Boolean) }),
+    modeTexts: () => ({ mini: { w: mw, h: mh, x: mx0, dots: miniDots }, center: center.text, toasts: tagTxt.filter(Boolean).map(t => t.text).filter(Boolean), tagFx: tagFx.length, mode: modeTxt.text, block: blockTxt.text, labels: objTxt.filter(Boolean).map(t => t.text).filter(Boolean) }),
     draw(snap) {
       fitLayer(); g.clear();
       const me = snap.players.find(p => p.id === meId), m = snap.match, cam = scene.cameras.main, v = cam.worldView;
@@ -106,25 +112,33 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
         objLabel(50 + objs.indexOf(z)).setFontSize(12).setColor('#ffffff').setAlpha(1).setPosition(ax, ay).setText(m.mode === 'hq' ? 'HQ' : m.mode === 'hp' ? '◆' : String(z.id));
       }
 
+      // minikort i egne graphics: baggrund/vægge/kasser ca. 1 Hz (og ved baneskift), prikker/mål/udsnit ca. 10 Hz
       map = world.map; M.tile = Math.min(5, 150 / map.width, 100 / map.height); mw = map.width * M.tile; mh = map.height * M.tile; mx0 = 1280 - M.margin - mw; my0 = M.margin;
-      // minikort: vægge, kasser, spawn-zoner, egne folk; fjender kun med synslinje
-      g.fillStyle(PALETTE.bg, 0.8).fillRect(mx0 - 3, my0 - 3, mw + 6, mh + 6).lineStyle(1, PALETTE.wallEdge, 0.8).strokeRect(mx0 - 3, my0 - 3, mw + 6, mh + 6);
-      if (map.spawnZones) for (const [team, z] of Object.entries(map.spawnZones)) g.fillStyle(team === 'blue' ? PALETTE.blue : PALETTE.red, 0.18).fillRect(mx0 + z.x0 * M.tile, my0, (z.x1 - z.x0 + 1) * M.tile, mh);
-      for (const t of world.tiles.values()) if (t.type === 'wall' || t.type === 'crate') g.fillStyle(t.type === 'wall' ? PALETTE.wallEdge : PALETTE.crateEdge, t.type === 'wall' ? 0.9 : 0.6).fillRect(mx0 + t.x * M.tile, my0 + t.y * M.tile, M.tile, M.tile);
-      for (const p of snap.players) {
-        if (!p.alive) continue;
-        const ally = p.team === me.team, seen = ally || (me.alive && hasLineOfSight(world, me, p));
-        if (!seen) continue;
-        const px = mx0 + p.x / TILE_PX * M.tile, py = my0 + p.y / TILE_PX * M.tile;
-        g.fillStyle(p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, 1).fillCircle(px, py, p.id === meId ? 3.5 : 2.5);
-        if (p.id === meId) g.lineStyle(1, 0xffffff, 1).strokeCircle(px, py, 5);
+      const now = scene.time.now, mkey = map.id + ':' + map.width;
+      if (mkey !== miniKey || now - miniStaticAt > 1000) {
+        miniKey = mkey; miniStaticAt = now; ms.clear();
+        ms.fillStyle(PALETTE.bg, 0.8).fillRect(mx0 - 3, my0 - 3, mw + 6, mh + 6).lineStyle(1, PALETTE.wallEdge, 0.8).strokeRect(mx0 - 3, my0 - 3, mw + 6, mh + 6);
+        if (map.spawnZones) for (const [team, z] of Object.entries(map.spawnZones)) ms.fillStyle(team === 'blue' ? PALETTE.blue : PALETTE.red, 0.18).fillRect(mx0 + z.x0 * M.tile, my0, (z.x1 - z.x0 + 1) * M.tile, mh);
+        for (const t of world.tiles.values()) if (t.type === 'wall' || t.type === 'crate') ms.fillStyle(t.type === 'wall' ? PALETTE.wallEdge : PALETTE.crateEdge, t.type === 'wall' ? 0.9 : 0.6).fillRect(mx0 + t.x * M.tile, my0 + t.y * M.tile, M.tile, M.tile);
       }
-      for (const z of objs) { // mål på minikortet
-        const a = z.active === false ? 0.35 : 0.9;
-        g.fillStyle(tcol(z.owner), z.owner ? 0.55 * a : 0.25 * a).fillRect(mx0 + z.x * M.tile, my0 + z.y * M.tile, z.w * M.tile, z.h * M.tile)
-          .lineStyle(1, z.active === false ? 0x8A93B0 : 0xffffff, a).strokeRect(mx0 + z.x * M.tile, my0 + z.y * M.tile, z.w * M.tile, z.h * M.tile);
+      if (now - miniDynAt >= 100) {
+        miniDynAt = now; md.clear(); miniDots = 0;
+        const big = map.width * map.height > 2000, r = big ? 2 : 2.5; // mange spillere på store baner: mindre prikker
+        for (const z of objs) { // mål på minikortet
+          const a = z.active === false ? 0.35 : 0.9;
+          md.fillStyle(tcol(z.owner), z.owner ? 0.55 * a : 0.25 * a).fillRect(mx0 + z.x * M.tile, my0 + z.y * M.tile, z.w * M.tile, z.h * M.tile)
+            .lineStyle(1, z.active === false ? 0x8A93B0 : 0xffffff, a).strokeRect(mx0 + z.x * M.tile, my0 + z.y * M.tile, z.w * M.tile, z.h * M.tile);
+        }
+        // egne folk altid; fjender kun med synslinje
+        for (const p of miniSrc(snap)) {
+          if (!p.alive || p.id === meId) continue;
+          const ally = p.team === me.team; if (!ally && !(me.alive && hasLineOfSight(world, me, p))) continue;
+          md.fillStyle(p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, ally ? 0.85 : 1).fillCircle(mx0 + p.x / TILE_PX * M.tile, my0 + p.y / TILE_PX * M.tile, r); miniDots++;
+        }
+        const mpx = mx0 + me.x / TILE_PX * M.tile, mpy = my0 + me.y / TILE_PX * M.tile;
+        md.fillStyle(me.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, 1).fillCircle(mpx, mpy, 3.5).lineStyle(1.5, 0xffffff, 1).strokeCircle(mpx, mpy, 5.5);
+        md.lineStyle(1, 0xffffff, 0.45).strokeRect(mx0 + v.x / TILE_PX * M.tile, my0 + v.y / TILE_PX * M.tile, v.width / TILE_PX * M.tile, v.height / TILE_PX * M.tile);
       }
-      g.lineStyle(1, 0xffffff, 0.35).strokeRect(mx0 + v.x / TILE_PX * M.tile, my0 + v.y / TILE_PX * M.tile, v.width / TILE_PX * M.tile, v.height / TILE_PX * M.tile);
 
       // pile ved skærmkanten for spillere uden for skærmen (fjender kun med synslinje)
       if (me.alive) for (const p of snap.players) {

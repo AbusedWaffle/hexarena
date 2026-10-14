@@ -13,27 +13,38 @@ for (const [w, h] of [[844, 390], [1280, 720]]) {
   const ok = {};
   const inView = (sel) => pg.$eval(sel, e => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth; });
   await pg.$eval('#lobby-mode', e => e.click()); await pg.waitForTimeout(200);
-  ok.panel = await inView('#lobby-mode-panel') && (await pg.$$('#lobby-mode-panel [data-mode]')).length === 6;
+  const NM = (await pg.evaluate(() => fetch('data/modes.json').then(r => r.json()))).modes.length;
+  ok.panel = await inView('#lobby-mode-panel') && (await pg.$$('#lobby-mode-panel [data-mode]')).length === NM && await pg.$eval('#lobby-mode-panel .hl-modes', e => e.scrollHeight <= e.clientHeight + 1)
+    && await pg.$$eval('#lobby-mode-panel [data-mode]', es => es.every(e => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }));
   await pg.screenshot({ path: `${P}_${w}.png` });
   await pg.$eval('#lobby-panel-close', e => e.click());
   const mapsIn = () => pg.$$eval('#lobby-map-panel [data-map]', es => es.map(e => e.dataset.map));
   const MAPS = await pg.evaluate(() => fetch('data/maps.json').then(r => r.json()));
-  const expect = Object.fromEntries(['knockout', 'tdm', 'kc', 'dom', 'hp', 'hq'].map(id => [id, MAPS.maps.filter(m => (m.modes || ['knockout', 'tdm', 'kc']).includes(id)).map(m => m.id)]));
+  const expect = Object.fromEntries(['knockout', 'tdm', 'kc', 'dom', 'hp', 'hq', 'invasion'].map(id => [id, MAPS.maps.filter(m => (m.modes || ['knockout', 'tdm', 'kc']).includes(id)).map(m => m.id)]));
   // start på en lille knockout-bane, så skift til HQ skal vælge en gyldig bane selv
   await pg.$eval('#lobby-map', e => e.click()); await pg.waitForTimeout(150); await pg.$eval('[data-map=alley_sq_01]', e => e.click()); await pg.waitForTimeout(150);
-  for (const id of ['hq', 'tdm', 'kc', 'dom', 'hp', 'knockout']) {
+  for (const id of ['hq', 'tdm', 'kc', 'dom', 'hp', 'invasion', 'knockout']) {
     await pg.$eval('#lobby-mode', e => e.click()); await pg.waitForTimeout(100);
     await pg.$eval(`#lobby-mode-panel [data-mode=${id}]`, e => e.click()); await pg.waitForTimeout(200);
     const st = await pg.evaluate(() => ({ s: __lobbySettings, last: __ev.filter(([n]) => n === 'hexarena:lobby-settings').at(-1)?.[1].settings, t: document.querySelector('#lobby-title').textContent, store: JSON.parse(localStorage.getItem('hexarena.menu.v1')).lobbySettings }));
     const o = { payload: st.s.mode === id && st.last?.mode === id && st.store.mode === id };
-    o.title = id === 'knockout' ? /HOLDKAMP · \d MOD \d · FØRST TIL \d/.test(st.t) : st.t.startsWith({ tdm: 'TEAM DEATHMATCH', kc: 'KILL CONFIRMED', dom: 'DOMINATION', hp: 'HARDPOINT', hq: 'HEADQUARTERS' }[id]) && /FØRST TIL \d{2,}/.test(st.t);
+    o.title = id === 'knockout' ? /HOLDKAMP · \d MOD \d · FØRST TIL \d/.test(st.t) : st.t.startsWith({ tdm: 'TEAM DEATHMATCH', kc: 'KILL CONFIRMED', dom: 'DOMINATION', hp: 'HARDPOINT', hq: 'HEADQUARTERS', invasion: 'INVASION · 20 MOD 20 · FØRST TIL 100' }[id]) && /FØRST TIL \d{2,}/.test(st.t);
     await pg.$eval('#lobby-map', e => e.click()); await pg.waitForTimeout(150);
     const got = await mapsIn(), note = !!(await pg.$('#lobby-map-note'));
     const ex = expect[id];
     o.maps = ex.length ? ex.every(m => got.includes(m)) && got.length === ex.length && !note : note;
     o.validMap = ex.includes(st.s.map);
     if (id === 'hq') o.autoMap = st.s.map !== 'alley_sq_01' && ex.includes(st.s.map);
-    await pg.$eval('#lobby-panel-close', e => e.click());
+    if (id === 'invasion') {
+      await pg.screenshot({ path: `${P}_invasion_maps_${w}.png` });
+      o.slagmark = (await pg.textContent('#lobby-map-panel')).includes('SLAGMARK');
+      await pg.$eval('#lobby-panel-close', e => e.click()); await pg.waitForTimeout(150);
+      // kompakt holdliste: højst ~6 rækker, robotter som '+N robotter', panelet flyder ikke over
+      o.roster = await pg.evaluate(() => { const rl = document.querySelector('#lobby-roster'), rows = rl.querySelectorAll('.hl-p'); const r = rl.getBoundingClientRect();
+        return rows.length <= 6 && /\+\d+ robotter/.test(rl.textContent) && rl.scrollHeight <= rl.clientHeight + 1 && r.bottom <= innerHeight; });
+      o.count = (await pg.textContent('.hl-count')).includes('/40 SPILLERE');
+      await pg.screenshot({ path: `${P}_invasion_${w}.png` });
+    } else await pg.$eval('#lobby-panel-close', e => e.click());
     ok[id] = o;
   }
   // dom igen og start: lobby-start har mode; derefter skrivebeskyttet

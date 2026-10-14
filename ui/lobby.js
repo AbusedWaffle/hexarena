@@ -35,9 +35,9 @@ const CSS = `
 .hl-mc .n{display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 6px;padding:3px 6px;font-size:12px;letter-spacing:.08em}
 .hl-mc .n i{font-style:normal;opacity:.6;font-size:11px}
 .hl-mc.sel{border-color:#4FA3FF;box-shadow:0 0 12px rgba(111,160,255,.45);background:rgba(79,163,255,.18)}
-.hl-modes{overflow:auto;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding-right:4px}
-.hl-md{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:3px;padding:clamp(5px,1.6vh,10px) 10px;background:rgba(34,48,90,.45);border:2px solid var(--ha-edge,#22305A);border-left:4px solid var(--ha-edge,#22305A)}
-.hl-md b{font-size:clamp(12px,3.6vh,16px);letter-spacing:.14em}.hl-md span{font-size:clamp(10px,3vh,13px);opacity:.85;line-height:1.3}.hl-md i{font-style:normal;font-size:11px;opacity:.6;letter-spacing:.06em}
+.hl-modes{overflow:auto;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding-right:4px}
+.hl-md{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:clamp(4px,1.2vh,9px) 8px;background:rgba(34,48,90,.45);border:2px solid var(--ha-edge,#22305A);border-left:4px solid var(--ha-edge,#22305A)}
+.hl-md b{font-size:clamp(11px,3.3vh,15px);letter-spacing:.1em}.hl-md span{font-size:clamp(10px,2.8vh,12px);opacity:.85;line-height:1.25}.hl-md i{margin-top:auto}.hl-md i{font-style:normal;font-size:11px;opacity:.6;letter-spacing:.06em}
 .hl-md.sel{border-color:#4FA3FF;box-shadow:0 0 12px rgba(111,160,255,.45);background:rgba(79,163,255,.18)}
 .hl-modes.ro .hl-md{cursor:default}.hl-modes.ro .hl-md:not(.sel){opacity:.45}
 .hl-mapcode{position:absolute;left:6px;top:4px;font-size:11px;letter-spacing:.12em;background:rgba(6,9,26,.7);padding:1px 5px}
@@ -50,7 +50,7 @@ const CSS = `
 .hl-roster{display:flex;flex-direction:column;gap:2px;overflow:auto;min-height:0}
 .hl-p{display:flex;align-items:center;gap:8px;height:clamp(18px,5.6vh,30px);flex:none;padding:0 8px;font-size:clamp(11px,3.2vh,15px);background:rgba(34,48,90,.45);border-left:4px solid}
 .hl-p.blue{border-color:#4FA3FF}.hl-p.red{border-color:#FF5A5A}
-.hl-p.bot{opacity:.55}
+.hl-p.bot{opacity:.55}.hl-p.more{font-style:italic}
 .hl-p.human{background:linear-gradient(90deg,rgba(255,215,90,.32),rgba(255,215,90,.08));color:#FFE9A8}
 .hl-p img{height:75%;aspect-ratio:1}
 .hl-p .t{margin-left:auto;font-size:.8em;opacity:.7;letter-spacing:.1em}
@@ -98,7 +98,7 @@ const persist = (patch) => { const o = { ...load(), ...patch }; localStorage.set
 let saved = load();
 let mode = qs.has('host') ? 'host' : qs.has('room') ? 'client' : 'local';
 let cls = qs.get('cls') || saved.cls || 'Assault';
-let settings = normalize({ ...DEF, ...(saved.lobbySettings || {}), ...(['knockout', 'tdm', 'kc', 'dom', 'hp', 'hq'].includes(qs.get('mode')) ? { mode: qs.get('mode') } : {}), ...(qs.get('map') ? { map: qs.get('map') } : {}), ...(saved.difficulty && !saved.lobbySettings ? { botDifficulty: saved.difficulty } : {}), ...(saved.teamSize && !saved.lobbySettings ? { teamSize: Math.min(4, saved.teamSize) } : {}) });
+let settings = normalize({ ...DEF, ...(saved.lobbySettings || {}), ...(['knockout', 'tdm', 'kc', 'dom', 'hp', 'hq', 'invasion'].includes(qs.get('mode')) ? { mode: qs.get('mode') } : {}), ...(qs.get('map') ? { map: qs.get('map') } : {}), ...(saved.difficulty && !saved.lobbySettings ? { botDifficulty: saved.difficulty } : {}), ...(saved.teamSize && !saved.lobbySettings ? { teamSize: Math.min(4, saved.teamSize) } : {}) });
 let started = false, panel = null, code = mode === 'client' ? qs.get('room') : null, roster = null, status = mode === 'local' ? 'open' : 'connecting', error = '', open = true, map = null, M = null;
 let active = mode !== 'local' || qs.get('lobby') === '1'; // lokalt spil viser kun lobbyen med ?lobby=1 (som game.js venter på)
 // Udadtil er botCount altid et tal (antal robotter i alt); 'Fyld' sendes som 2·teamSize−1 + botFill:true.
@@ -125,7 +125,9 @@ let GMODES = [
 fetch(new URL('../data/modes.json', import.meta.url)).then(r => r.ok ? r.json() : null).then(j => { const l = Array.isArray(j) ? j : j?.modes; if (l?.length) { GMODES = l; if (j.default) DEF.mode = j.default; fixMap(); render(); } }).catch(() => {});
 const modeInfo = (id = settings.mode) => GMODES.find(g => g.id === id) || GMODES[0];
 const mapModes = (m) => m.modes || ['knockout', 'tdm', 'kc'];
-const SIZES = ['small', 'medium', 'large', 'xl'];
+const SIZES = ['small', 'medium', 'large', 'xl', 'huge'];
+// holdstørrelse: tilstande med fast størrelse (fx Invasion 20 mod 20) overstyrer lobbyens valg
+const teamOf = () => modeInfo().teamSize || settings.teamSize;
 const bySize = (a, b) => (SIZES.indexOf(a.size) - SIZES.indexOf(b.size)) || a.width * a.height - b.width * b.height;
 const validMaps = (id = settings.mode) => (MAPS?.maps || []).filter(m => mapModes(m).includes(id));
 // sikr at banen passer til tilstanden (ellers første gyldige, små først); returnerer et patch eller null
@@ -188,12 +190,12 @@ function rowEl(r) {
 // Forhåndsvisning af holdene ud fra indstillingerne (når spillet ikke har sendt en roster)
 // Mennesker tages fra spillets roster (hvis sendt), ledige pladser fyldes med robotter efter indstillingerne.
 function previewRoster() {
-  const t = settings.teamSize, order = ['Assault', 'Sniper', 'Engineer', 'Scout', 'Support'];
+  const t = teamOf(), order = ['Assault', 'Sniper', 'Engineer', 'Scout', 'Support'];
   const out = (roster || []).filter(x => x.human);
   if (!out.some(x => x.id === 'me') && mode !== 'client') out.unshift({ id: 'me', team: 'blue', cls, human: true, name: 'Dig' });
   if (mode === 'client' && !out.length) out.push({ id: 'me', team: 'blue', cls, human: true, name: 'Dig' });
   let b = out.filter(x => x.team !== 'red').length, r = out.length - b;
-  const n = Math.min(2 * t - out.length, !settings.bots ? 0 : settings.botCount === 'fill' ? 2 * t - 1 : settings.botCount);
+  const n = Math.min(2 * t - out.length, modeInfo().botFill ? 2 * t : !settings.bots ? 0 : settings.botCount === 'fill' ? 2 * t - 1 : settings.botCount);
   for (let i = 0; i < n; i++) {
     if (r < t && (r < b || b >= t)) out.push({ id: 'botR' + r, team: 'red', cls: order[r % 5], human: false }), r++;
     else out.push({ id: 'botB' + b, team: 'blue', cls: order[b % 5], human: false }), b++;
@@ -263,7 +265,7 @@ function render() {
   const s = el('div', 'hl-status' + (status === 'error' ? ' err' : ''),
     status === 'error' ? 'Netværksfejl: ' + error : mode === 'local' ? 'Kamp mod robotter · ' + DIFF[settings.botDifficulty] : mode === 'client' ? (status === 'open' ? 'Forbundet – venter på at host starter' : 'Forbinder til ' + code + '…') : status === 'open' ? 'Klar – venner kan nu deltage med koden' : 'Opretter spil…');
   s.id = 'lobby-status';
-  const t = settings.teamSize;
+  const t = teamOf();
   const gm = modeInfo(), ko = gm.id === 'knockout';
   const tt = el('div', 'hl-title', ko ? (MODES[(qs.get('mode') || '').toLowerCase()] || 'HOLDKAMP') : gm.name.toUpperCase()); tt.id = 'lobby-title';
   tt.append(el('small', '', ` · ${t} MOD ${t} · FØRST TIL ${ko || !gm.scoreTarget ? settings.roundsToWin : gm.scoreTarget}`));
@@ -274,12 +276,19 @@ function render() {
   const head = el('div', 'hl-head'); head.append(el('span', '', mode === 'local' ? 'Holdene' : 'Venter på spillere'), el('span', 'hl-sub', mode === 'local' ? 'Mod robotter' : 'Lobby'));
   const rl = el('div', 'hl-roster'); rl.id = 'lobby-roster';
   const blue = list.filter(r => r.team !== 'red'), red = list.filter(r => r.team === 'red');
-  blue.forEach(r => rl.append(rowEl(r))); if (blue.length && red.length) rl.append(el('div', 'hl-gap')); red.forEach(r => rl.append(rowEl(r)));
+  // store hold (fx Invasion 20 mod 20): mennesker som rækker, robotter samlet i én linje pr. hold
+  const compact = list.length > 10;
+  const team = (rs, tm) => {
+    const show = compact ? rs.filter(r => r.human) : rs; show.forEach(r => rl.append(rowEl(r)));
+    const nb = rs.length - show.length;
+    if (nb > 0) { const d = el('div', 'hl-p bot more ' + tm); d.append(el('span', '', `+${nb} robotter`), el('span', 't', tm === 'red' ? 'RØD' : 'BLÅ')); rl.append(d); }
+  };
+  team(blue, 'blue'); if (blue.length && red.length) rl.append(el('div', 'hl-gap')); team(red, 'red');
   R.append(head, rl, el('div', 'hl-count', `${humans}/${2 * t} SPILLERE`));
 
   const tick = el('div', 'hl-tick', mode === 'host' ? `Del koden ${code} med dine venner – de kan scanne QR-koden eller åbne linket`
     : mode === 'client' ? `Du er med i spil ${code} – vælg klasse, mens du venter på at host starter kampen`
-    : `${t} mod ${t} · robotter: ${DIFF[settings.botDifficulty]} · først til ${settings.roundsToWin} runder · ${settings.roundTimeSec} s pr. runde`);
+    : `${t} mod ${t} · robotter: ${DIFF[settings.botDifficulty]} · ${gm.id === 'knockout' || !gm.scoreTarget ? `først til ${settings.roundsToWin} runder · ${settings.roundTimeSec} s pr. runde` : `først til ${gm.scoreTarget} · ${Math.round((gm.timeSec || 600) / 60)} min`}`);
   wrap.append(L, R, tick);
   if (panel) wrap.append(modal());
 }
