@@ -20,7 +20,10 @@ export function createInputSystem(scene, { getPlayerScreenPos, getAbilityRangePx
   const drag = (s, p) => { const d = Math.hypot(p.x - s.ox, p.y - s.oy); if (s.max !== undefined && d > s.max) s.max = d; return { x: p.x - s.ox, y: p.y - s.oy, d }; };
 
   // Hele venstre/højre halvdel af skærmen tæller, også sorte kanter uden for selve spillet (Phaser sender dem som *outside*).
+  // Tryk på DOM-UI (≡-menu, lobby, knapper) må ikke blive til skud/joystick
+  const onUi = (p) => { const t = p.event?.target; return !!(t && t !== scene.game.canvas && t.closest?.('button, a, input, .hl-wrap, .hi-wrap, .hm-ingame')); };
   const onDown = (p) => {
+    if (onUi(p)) { if (!p.wasTouch) mouse = null; return; }
     if (!p.wasTouch) { mouse = { right: p.rightButtonDown() }; return; }
     if (inBtn(p) && !abil) { abil = { id: p.id, ox: C.abilityBtn.x, oy: C.abilityBtn.y, max: 0, t: p.downTime }; return; }
     if (p.x < 640 && !move) { move = { id: p.id, ox: p.x, oy: p.y }; return; }   // flydende joystick
@@ -41,6 +44,7 @@ export function createInputSystem(scene, { getPlayerScreenPos, getAbilityRangePx
     for (const s of [attack, abil]) if (s && s.id === p.id) s.max = Math.max(s.max, drag(s, p).d);
   });
   const onUp = (p) => {
+    if (!p.wasTouch && !mouse) return; // museknappen blev trykket på UI
     if (!p.wasTouch) { // desktop: venstre slip = manuelt skud mod musen, højre slip = sigtet ability
       const s = getPlayerScreenPos(), v = { x: p.x - s.x, y: p.y - s.y };
       if (mouse?.right) pendingAbility = { aim: scaleTo(v, Math.min(1, Math.hypot(v.x, v.y) / Math.max(1, getAbilityRangePx()))) };

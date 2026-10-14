@@ -99,22 +99,9 @@ async function startGame(fromMenu = false) {
   // Alle kampe går gennem lobbyen (lokal, host og klient); ?lobby=0 springer den over (tests/debug).
   if (new URLSearchParams(location.search).get('lobby') !== '0') await import('./lobby.js');
   await import('./spectate.js'); // tilskuer-bjælke (hexarena:spectate)
-  import('../render/game.js');
   addCss('art/menu.css'); addCss('ui/menu.css');
-  const toMenu = () => { location.href = location.pathname; };
-  const again = () => { location.reload(); };
-  const btn = el('button', 'ha-btn hm-ingame'); btn.textContent = '≡'; btn.title = 'Menu';
-  btn.onclick = () => { if (confirm('Forlad kampen og gå til menuen?')) toMenu(); };
-  document.body.appendChild(btn);
-  let shown = false;
-  setInterval(() => { // knapper når kampen er slut
-    const m = globalThis.__arena?.cur?.match; if (!m?.over || shown) return; shown = true;
-    const box = el('div', 'hm-over');
-    box.innerHTML = `<button class="ha-btn primary">Ny kamp</button><button class="ha-btn">Menu</button>`;
-    const [a, b] = box.querySelectorAll('button'); a.onclick = again; b.onclick = toMenu;
-    if (qs.has('room')) a.remove(); // klienter kan ikke starte en ny kamp selv
-    document.body.appendChild(box);
-  }, 500);
+  import('../render/game.js');
+  await import('./ingame.js'); // én samlet in-game-menu (≡) inkl. knapper ved kampens slut
 }
 
 function el(tag, cls) { const e = document.createElement(tag); e.className = cls; return e; }

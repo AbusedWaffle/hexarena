@@ -26,7 +26,7 @@ addEventListener('hexarena:spectate', (e) => show(e.detail));
 addEventListener('pointerdown', (e) => {
   if (!cur || !(cur.count > 1)) return;
   const t = e.target;
-  if (t.closest?.('button, a, input, select, #lobby, #lobby-chip, .hm-over, .hm-ingame')) return;
+  if (t.closest?.('button, a, input, select, #lobby, .hi-wrap, .hm-ingame')) return;
   const now = performance.now(); if (now - last < 250) return; last = now;
   dispatchEvent(new CustomEvent('hexarena:spectate-next'));
 }, true);

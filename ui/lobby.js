@@ -59,7 +59,7 @@ const CSS = `
 .hl-mcol{display:flex;flex-direction:column;gap:clamp(6px,2vh,12px)}
 .hl-mbox .hl-code{font-size:clamp(36px,13vh,72px)}
 .hl-mbox .ha-btn{min-height:40px}
-.hl-chip{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;font:600 13px 'Roboto Mono',monospace;padding:6px 10px;border-radius:8px;background:rgba(6,9,26,.8);color:#E6ECFF;border:1px solid #4FA3FF;cursor:pointer}
+.hl-wrap.only-panel{background:rgba(6,9,26,.35)}.hl-wrap.only-panel>.hl-l,.hl-wrap.only-panel>.hl-r,.hl-wrap.only-panel>.hl-tick{visibility:hidden}
 .hl-mbox.wide{flex-direction:column;align-items:stretch;width:min(92vw,820px);gap:clamp(6px,1.6vh,12px)}
 .hl-mhead{display:flex;justify-content:space-between;align-items:center;font-size:clamp(13px,4vh,18px);letter-spacing:.2em}
 .hl-mhead .ha-btn{min-height:32px;min-width:0;padding:0 16px;font-size:14px}
@@ -135,8 +135,7 @@ const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.classN
 if (!document.querySelector('link[href="art/menu.css"]')) { const l = el('link'); l.rel = 'stylesheet'; l.href = 'art/menu.css'; document.head.append(l); }
 const st = el('style'); st.textContent = CSS; document.head.append(st);
 const wrap = el('div', 'hl-wrap'); wrap.id = 'lobby';
-const chip = el('button', 'hl-chip'); chip.id = 'lobby-chip'; chip.hidden = true;
-chip.onclick = () => { open = true; render(); };
+let panelOnly = false; // panel åbnet fra in-game-menuen (ui/ingame.js): kun panelet vises, luk = tilbage til kampen
 const link = () => location.origin + location.pathname + '?room=' + code;
 
 function drawMap() {
@@ -193,8 +192,8 @@ function setClass(c) {
 function render() {
   if (!active || (mode !== 'local' && !code)) return;
   if (!document.body) return void addEventListener('DOMContentLoaded', render, { once: true });
-  if (!wrap.isConnected) document.body.append(wrap, chip);
-  wrap.hidden = !open; chip.hidden = open; chip.textContent = code ? 'Kode ' + code : '≡ Lobby';
+  if (!wrap.isConnected) document.body.append(wrap);
+  wrap.hidden = !open; wrap.classList.toggle('only-panel', panelOnly && !!panel);
   if (!open) return;
   wrap.replaceChildren();
   const L = el('div', 'hl-l'), R = el('div', 'hl-r');
@@ -259,7 +258,7 @@ function render() {
 function modal() {
   const m = el('div', 'hl-modal'), close = el('button', 'ha-btn primary', 'LUK');
   close.id = panel === 'code' ? 'lobby-code-close' : 'lobby-panel-close';
-  close.onclick = () => { panel = null; render(); };
+  close.onclick = () => { panel = null; if (panelOnly) { panelOnly = false; open = false; } render(); };
   m.onclick = (e) => { if (e.target === m) close.onclick(); };
   if (panel === 'code') {
     const box = el('div', 'hl-mbox'), col = el('div', 'hl-mcol');
@@ -274,7 +273,7 @@ function modal() {
   if (panel === 'map' && !(editable() && MAPS)) { panel = null; return el('div'); }
   const box = el('div', 'hl-mbox wide' + (panel === 'map' ? ' maps' : '')); box.id = { class: 'lobby-class-panel', map: 'lobby-map-panel' }[panel] || 'lobby-settings-panel';
   const head = el('div', 'hl-mhead');
-  head.append(el('span', '', panel === 'class' ? 'VÆLG KLASSE' : panel === 'map' ? 'VÆLG BANE' : 'INDSTILLINGER' + (editable() ? '' : ' · KUN HOST')), close);
+  head.append(el('span', '', panel === 'class' ? 'VÆLG KLASSE' : panel === 'map' ? 'VÆLG BANE' : 'INDSTILLINGER' + (editable() ? '' : started ? ' · KAN ÆNDRES I LOBBYEN' : ' · KUN HOST')), close);
   box.append(head);
   if (panel === 'map') {
     const list = el('div', 'hl-maps'), order = ['small', 'medium', 'large'];
@@ -344,4 +343,10 @@ globalThis.addEventListener('hexarena:lobby', (e) => {
   if (d.status) { status = d.status; error = d.error || ''; if (status === 'error') open = true; }
   render();
 });
+// API til in-game-menuen (ui/ingame.js)
+globalThis.__lobbyUI = {
+  mode: () => mode, code: () => code, isOpen: () => open && !wrap.hidden,
+  openLobby() { panelOnly = false; panel = null; open = true; render(); },
+  openPanel(p) { panelOnly = true; panel = p; open = true; render(); },
+};
 render();

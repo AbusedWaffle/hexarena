@@ -14,9 +14,6 @@
 .hm-back { align-self: flex-start; min-width: 0; min-height: 40px !important; padding: 0 14px; font-size: 15px !important; margin-bottom: -6px; }
 .hm-code { font: 800 34px var(--ha-font); letter-spacing: 8px; text-transform: uppercase; text-align: center; width: 260px; padding: 8px; border-radius: var(--ha-radius); border: 2px solid var(--ha-edge); background: var(--ha-panel); color: var(--ha-score); }
 .hm-err { color: var(--ha-red-glow); font-size: 13px; min-height: 16px; }
-.hm-ingame { position: fixed; top: 8px; left: 8px; z-index: 30; min-width: 0; min-height: 36px; padding: 0 12px; font-size: 18px; opacity: .75; }
-.hm-over { position: fixed; left: 50%; bottom: 14%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 30; }
-.hm-over .ha-btn { min-width: 170px; }
 @media (max-height: 520px) {
   .hm-root { padding-top: 10px; gap: 8px; }
   .hm-root .ha-title { font-size: 30px; }

@@ -1,6 +1,6 @@
 // Lobby (844×390 som standard; VW/VH kan sættes): host – VIS KODE (kode+QR), KLASSE (Sniper → hexarena:lobby-class),
 // INDSTILLINGER (2 mod 2, Svær, først til 5, 60 s → __lobbySettings), klient ser indstillinger skrivebeskyttet og ingen START,
-// start/luk/chip. Lokal tilstand: ingen kode/VIS KODE/DEL LINK. Skærmbilleder: SHOT_PREFIX_*.png.
+// start/luk, genåbning via ≡ → TILBAGE TIL LOBBYEN (ingen kode-chip). Lokal tilstand: ingen kode/VIS KODE/DEL LINK. Skærmbilleder: SHOT_PREFIX_*.png.
 import { chromium } from 'playwright';
 const PORT = process.env.PORT || 8090, VW = +(process.env.VW || 844), VH = +(process.env.VH || 390), P = process.env.SHOT_PREFIX || '/tmp/lobby';
 const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader'] });
@@ -60,8 +60,8 @@ await pg.bringToFront(); await pg.waitForTimeout(1500);
 ok.joinShown = (await pg.textContent('#lobby-roster')).includes('Spiller');
 await click(pg, '#lobby-start'); await pg.waitForTimeout(200);
 ok.startEvents = await pg.evaluate(() => globalThis.__lobbyStarted === true && __ev.filter(([n]) => n === 'hexarena:lobby-start').length === 1);
-ok.closed = await pg.$eval('#lobby', e => e.hidden) && await inView(pg, '#lobby-chip');
-await click(pg, '#lobby-chip'); ok.reopen = !(await pg.$eval('#lobby', e => e.hidden));
+ok.closed = await pg.$eval('#lobby', e => e.hidden) && !(await pg.$('#lobby-chip'));
+await click(pg, '#ingame-menu-btn'); await click(pg, '#im-lobby'); ok.reopen = !(await pg.$eval('#lobby', e => e.hidden)) && (await pg.textContent('#lobby-start')).includes('TILBAGE TIL KAMPEN');
 // lokal
 const lo = await newPage('?cls=Scout&diff=normal&lobby=1');
 ok.local = !!(await lo.$('#lobby-start')) && !(await lo.$('#lobby-show-code')) && !(await lo.$('#lobby-share')) && !(await lo.$('.hl-mapcode')) && (await lo.$$('#lobby-roster .hl-p')).length > 1;
