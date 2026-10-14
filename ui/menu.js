@@ -21,9 +21,10 @@ async function showMenu() {
       <div class="ha-title">HEXARENA</div>
       <button class="ha-btn primary" data-go="single">Spil mod robotter</button>
       <button class="ha-btn" data-go="host">Opret spil</button>
+      <button class="ha-btn" data-go="openGames" id="hm-open-games">ÅBNE SPIL</button>
       <button class="ha-btn" data-go="join">Deltag med kode</button>
       ${saved.cls ? `<div class="hm-sub">Sidst: ${name(saved.cls)}, ${diffName(saved.lobbySettings?.botDifficulty || saved.difficulty)}, ${saved.lobbySettings?.teamSize || saved.teamSize} mod ${saved.lobbySettings?.teamSize || saved.teamSize}</div>` : ''}
-    </div>`, { single, host, join });
+    </div>`, { single, host, join, openGames });
 
   // Klasse, holdstørrelse, robotter og sværhedsgrad vælges nu i lobbyen (ui/lobby.js) – menuen går direkte dertil.
   const ls = () => ({ teamSize: 3, bots: true, botCount: 'fill', botDifficulty: st.difficulty || 'normal', ...(saved.lobbySettings || {}) });
@@ -46,6 +47,35 @@ async function showMenu() {
       if (inp.value.length !== 5) { err.textContent = 'Koden er på 5 tegn.'; return; }
       launch({ mode: 'join', code: inp.value, cls: st.cls });
     };
+  }
+
+  // ÅBNE SPIL: liste over offentlige lobbyer (net/lobbyList.js); JOIN går gennem samme vej som "Deltag med kode".
+  let olTimer = null;
+  async function openGames() {
+    const [{ createLobbyList }, modes, maps] = await Promise.all([import('../net/lobbyList.js'),
+      fetch('data/modes.json').then(r => r.json()).catch(() => ({})), fetch('data/maps.json').then(r => r.json()).catch(() => ({}))]);
+    const LL = createLobbyList({ backend: 'fake' });
+    const mName = (id) => (modes.modes || []).find(m => m.id === id)?.name || id;
+    const bName = (id) => (maps.maps || []).find(m => m.id === id)?.name || id;
+    screen(`<div class="hm-ol" id="open-games">
+      <div class="hm-ol-head"><button class="ha-btn hm-back" data-go="home">‹ Tilbage</button><div class="hm-ol-title">ÅBNE SPIL</div>
+      <button class="ha-btn hm-ol-refresh" id="ol-refresh">OPDATER</button></div>
+      <div class="hm-ol-list" id="ol-list"></div></div>`, { home });
+    const list = root.querySelector('#ol-list');
+    const esc = (t) => String(t ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+    const refresh = async () => {
+      if (!root.contains(list)) { clearInterval(olTimer); olTimer = null; return; }
+      const ls = await LL.list();
+      list.innerHTML = ls.length ? '' : '<div class="hm-ol-empty">Ingen åbne spil lige nu</div>';
+      for (const l of ls) {
+        const r = el('div', 'hm-ol-row'); r.dataset.code = l.code;
+        r.innerHTML = `<b>${esc(l.hostName)}</b><span>${esc(mName(l.mode))}</span><span>${esc(bName(l.map))}</span><i>${l.count}/${l.max}</i><button class="ha-btn primary hm-ol-join">JOIN</button>`;
+        r.querySelector('button').onclick = () => { clearInterval(olTimer); olTimer = null; launch({ mode: 'join', code: l.code, cls: st.cls }); };
+        list.append(r);
+      }
+    };
+    root.querySelector('#ol-refresh').onclick = refresh;
+    clearInterval(olTimer); olTimer = setInterval(refresh, 15000); refresh();
   }
 
   // ---- hjælpere ----

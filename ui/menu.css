@@ -22,3 +22,18 @@
   .hm-root .ha-btn { min-height: 44px; font-size: 17px; }
   .hm-detail { font-size: 12px; }
 }
+
+/* ÅBNE SPIL (lobby-stil: mørkt panel, blå venstrekant) */
+.hm-ol { width: min(900px, 96vw); display: flex; flex-direction: column; gap: 10px; margin: auto 0; }
+.hm-ol-head { display: flex; align-items: center; gap: 12px; }
+.hm-ol-head .hm-back { margin: 0; }
+.hm-ol-title { flex: 1; font-size: 22px; font-weight: 800; letter-spacing: 3px; color: var(--ha-text); }
+.hm-ol-refresh { min-width: 0; min-height: 40px !important; padding: 0 14px; font-size: 15px !important; }
+.hm-ol-list { display: flex; flex-direction: column; gap: 6px; background: var(--ha-panel); border: 1px solid var(--ha-edge); border-left: 4px solid #4FA3FF; padding: 10px; min-height: 120px; max-height: 60vh; overflow-y: auto; }
+.hm-ol-row { display: grid; grid-template-columns: 1.3fr 1.2fr 1.2fr 60px auto; gap: 10px; align-items: center; padding: 6px 10px; background: rgba(79,163,255,.08); border-left: 3px solid #4FA3FF; font-size: 15px; color: var(--ha-text); }
+.hm-ol-row span { color: var(--ha-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-ol-row b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-ol-row i { font-style: normal; color: var(--ha-score); text-align: right; }
+.hm-ol-join { min-width: 0; min-height: 38px !important; padding: 0 16px; font-size: 15px !important; }
+.hm-ol-empty { margin: auto; color: var(--ha-dim); font-size: 15px; }
+@media (max-height: 520px) { .hm-ol-list { max-height: 64vh; } .hm-ol-row { font-size: 13px; padding: 4px 8px; } }

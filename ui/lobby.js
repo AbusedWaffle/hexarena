@@ -232,7 +232,7 @@ function render() {
     mi(started ? 'TILBAGE TIL KAMPEN' : 'START KAMPEN', 'lobby-start', () => {
       open = false; panel = null;
       // første tryk starter kampen: game.js holder simulering/rundeur stille indtil dette event (sendes kun én gang)
-      if (!started) { started = true; globalThis.__lobbyStarted = true; emit('hexarena:lobby-start', { code, mode, cls, settings: pub(settings) }); }
+      if (!started) { started = true; globalThis.__lobbyStarted = true; syncPublish(); emit('hexarena:lobby-start', { code, mode, cls, settings: pub(settings) }); }
       render();
     }, ' sel primary');
   } else {
@@ -393,10 +393,24 @@ globalThis.addEventListener('hexarena:lobby', (e) => {
   if (d.started === false && started) resetStarted();
   if (d.started && !started) { started = true; if (mode === 'client') { open = false; panel = null; } }
   if (d.status) { status = d.status; error = d.error || ''; if (status === 'error') open = true; }
-  render();
+  render(); syncPublish();
 });
+// ÅBNE SPIL: værten publicerer lobbyen (net/lobbyList.js, fake backend) med heartbeat, så længe den er åben; fjernes ved start/luk.
+let LL = null, publishing = false;
+const lobbyEntry = () => {
+  if (mode !== 'host' || !code || started || status === 'error') return null;
+  const hum = (roster || []).filter(r => r.human);
+  return { code, hostName: hum[0]?.name || 'Vært', mode: settings.mode, map: settings.map, count: Math.max(1, hum.length), max: 2 * teamOf(), hasCode: true };
+};
+async function syncPublish() {
+  const want = !!lobbyEntry();
+  if (want && !publishing) { publishing = true; LL ||= (await import('../net/lobbyList.js')).createLobbyList({ backend: 'fake' }); LL.startHeartbeat(lobbyEntry); }
+  else if (want && LL) LL.publish(lobbyEntry()); // ændrede indstillinger/spillere vises med det samme
+  else if (!want && publishing) { publishing = false; LL?.stop(); LL?.remove(code); }
+}
+globalThis.addEventListener('pagehide', () => { if (publishing) { LL?.stop(); LL?.remove(code); } });
 // Kampen afbrudt (hexarena:lobby-reset → game.js sender started:false): tilbage til før start
-function resetStarted() { started = false; globalThis.__lobbyStarted = false; panelOnly = false; panel = null; open = true; }
+function resetStarted() { started = false; globalThis.__lobbyStarted = false; panelOnly = false; panel = null; open = true; syncPublish(); }
 // API til in-game-menuen (ui/ingame.js)
 globalThis.__lobbyUI = {
   mode: () => mode, code: () => code, isOpen: () => open && !wrap.hidden,

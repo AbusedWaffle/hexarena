@@ -1,9 +1,9 @@
 // HexArena service worker. Netværk først (så nye commits altid slår igennem), cache som offline-fallback.
 // Bump VERSION ved udgivelse for at rydde gamle caches.
-const VERSION = 'hexarena-v7';
+const VERSION = 'hexarena-v8';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'vendor/phaser.min.js',
   'render/game.js', 'render/hud.js', 'render/inputSystem.js',
-  'sim/world.js', 'sim/grid.js', 'sim/ai.js', 'net/transport.js', 'net/codec.js', 'net/session.js', 'vendor/peerjs.min.js',
+  'sim/world.js', 'sim/grid.js', 'sim/ai.js', 'net/transport.js', 'net/codec.js', 'net/session.js', 'net/lobbyList.js', 'vendor/peerjs.min.js',
   'art/palette.js', 'art/shapes.js', 'art/squareMap.js', 'art/abilityFx.js',
   'data/classes.square.json', 'data/ai.json',
   'icons/icon-192.png', 'icons/icon-512.png',
