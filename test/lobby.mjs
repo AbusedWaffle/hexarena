@@ -39,7 +39,7 @@ await click(pg, '#lobby-panel-close');
 // BANE
 await pg.tap('#lobby-map'); await pg.waitForTimeout(400);
 ok.mapPanelInView = await inView(pg, '#lobby-map-panel') && await inView(pg, '#lobby-panel-close');
-ok.mapCards = (await pg.$$('#lobby-map-panel [data-map]')).length === 6;
+ok.mapCards = (await pg.$$('#lobby-map-panel [data-map]')).length === await pg.evaluate(async () => { const j = await (await fetch('data/maps.json')).json(), md = __lobbySettings.mode; return j.maps.filter(m => (m.modes || ['knockout', 'tdm', 'kc']).includes(md)).length; });
 await pg.screenshot({ path: P + '_maps.png' });
 await click(pg, '#lobby-map-panel [data-map=alley_sq_01]'); await pg.waitForTimeout(400);
 ok.mapPicked = await pg.evaluate(() => __lobbySettings.map === 'alley_sq_01' && !document.querySelector('#lobby-map-panel') && __ev.some(([n, d]) => n === 'hexarena:lobby-settings' && d.settings.map === 'alley_sq_01') && JSON.parse(localStorage.getItem('hexarena.menu.v1')).lobbySettings.map === 'alley_sq_01');

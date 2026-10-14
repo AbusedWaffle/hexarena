@@ -35,6 +35,11 @@ const CSS = `
 .hl-mc .n{display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 6px;padding:3px 6px;font-size:12px;letter-spacing:.08em}
 .hl-mc .n i{font-style:normal;opacity:.6;font-size:11px}
 .hl-mc.sel{border-color:#4FA3FF;box-shadow:0 0 12px rgba(111,160,255,.45);background:rgba(79,163,255,.18)}
+.hl-modes{overflow:auto;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding-right:4px}
+.hl-md{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:3px;padding:clamp(5px,1.6vh,10px) 10px;background:rgba(34,48,90,.45);border:2px solid var(--ha-edge,#22305A);border-left:4px solid var(--ha-edge,#22305A)}
+.hl-md b{font-size:clamp(12px,3.6vh,16px);letter-spacing:.14em}.hl-md span{font-size:clamp(10px,3vh,13px);opacity:.85;line-height:1.3}.hl-md i{font-style:normal;font-size:11px;opacity:.6;letter-spacing:.06em}
+.hl-md.sel{border-color:#4FA3FF;box-shadow:0 0 12px rgba(111,160,255,.45);background:rgba(79,163,255,.18)}
+.hl-modes.ro .hl-md{cursor:default}.hl-modes.ro .hl-md:not(.sel){opacity:.45}
 .hl-mapcode{position:absolute;left:6px;top:4px;font-size:11px;letter-spacing:.12em;background:rgba(6,9,26,.7);padding:1px 5px}
 .hl-codebox{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
 .hl-qr{background:#fff;padding:4px;height:clamp(60px,26vh,150px);aspect-ratio:1;box-sizing:border-box}
@@ -103,10 +108,32 @@ globalThis.__lobbySettings = pub(settings);
 function normalize(x) {
   const t = Number(x.teamSize) || 3, max = 2 * t - 1;
   const bc = x.botCount === 'fill' || x.botCount == null ? 'fill' : Math.max(0, Math.min(max, Number(x.botCount)));
-  return { teamSize: t, bots: x.bots !== false, botCount: bc, botDifficulty: x.botDifficulty || 'normal', roundsToWin: Number(x.roundsToWin) || 3, roundTimeSec: Number(x.roundTimeSec) || 75, map: x.map || DEF.map || 'paintyard_sq_01' };
+  return { teamSize: t, bots: x.bots !== false, botCount: bc, botDifficulty: x.botDifficulty || 'normal', roundsToWin: Number(x.roundsToWin) || 3, roundTimeSec: Number(x.roundTimeSec) || 75, map: x.map || DEF.map || 'paintyard_sq_01', mode: x.mode || DEF.mode || 'knockout' };
 }
 const emit = (name, detail) => globalThis.dispatchEvent(new CustomEvent(name, { detail }));
 const editable = () => mode !== 'client' && !started;
+
+// Spiltilstande: data/modes.json hvis den findes, ellers indbygget liste i samme form.
+let GMODES = [
+  { id: 'knockout', name: 'Knockout', desc: 'Ét liv pr. runde – sidste hold i live vinder runden.', scoreTarget: null, timeSec: 75, respawnSec: null, mapTags: [] },
+  { id: 'tdm', name: 'Team Deathmatch', desc: 'Hvert drab giver et point. Først til målet vinder.', scoreTarget: 50, timeSec: 600, respawnSec: 3, mapTags: [] },
+  { id: 'kc', name: 'Kill Confirmed', desc: 'Saml fjendens mærke efter drab for at score – red dine egne.', scoreTarget: 50, timeSec: 600, respawnSec: 3, mapTags: [] },
+  { id: 'dom', name: 'Domination', desc: 'Hold zonerne A, B og C – point for hver zone I ejer.', scoreTarget: 200, timeSec: 600, respawnSec: 4, mapTags: ['zones3'] },
+  { id: 'hp', name: 'Hardpoint', desc: 'Én zone der flytter sig – stå i den for at score.', scoreTarget: 250, timeSec: 600, respawnSec: 4, mapTags: ['hardpoint'] },
+  { id: 'hq', name: 'Headquarters', desc: 'Erobr hovedkvarteret og forsvar det – ingen respawn for ejerne.', scoreTarget: 200, timeSec: 600, respawnSec: 5, mapTags: ['hq'] },
+];
+fetch(new URL('../data/modes.json', import.meta.url)).then(r => r.ok ? r.json() : null).then(j => { const l = Array.isArray(j) ? j : j?.modes; if (l?.length) { GMODES = l; if (j.default) DEF.mode = j.default; fixMap(); render(); } }).catch(() => {});
+const modeInfo = (id = settings.mode) => GMODES.find(g => g.id === id) || GMODES[0];
+const mapModes = (m) => m.modes || ['knockout', 'tdm', 'kc'];
+const SIZES = ['small', 'medium', 'large', 'xl'];
+const bySize = (a, b) => (SIZES.indexOf(a.size) - SIZES.indexOf(b.size)) || a.width * a.height - b.width * b.height;
+const validMaps = (id = settings.mode) => (MAPS?.maps || []).filter(m => mapModes(m).includes(id));
+// sikr at banen passer til tilstanden (ellers første gyldige, små først); returnerer et patch eller null
+function mapFor(modeId, cur = settings.map) {
+  const v = validMaps(modeId); if (!MAPS || !v.length || v.some(m => m.id === cur)) return null;
+  return v.sort(bySize)[0].id;
+}
+function fixMap() { if (mode === 'client') return; const m = mapFor(settings.mode); if (m) { settings = normalize({ ...settings, map: m }); globalThis.__lobbySettings = pub(settings); } }
 
 // Baner fra data/maps.json; kortet i lobbyen viser art/maps/<id>.png (fallback: tegning fra banefilen).
 let MAPS = null, mapCache = {};
@@ -119,7 +146,7 @@ function loadMapFile() {
 fetch(new URL('../data/maps.json', import.meta.url)).then(r => r.json()).then(j => {
   MAPS = j; if (!DEF.map) DEF.map = j.default;
   if (!MAPS.maps.some(m => m.id === settings.map)) settings = normalize({ ...settings, map: j.default });
-  globalThis.__lobbySettings = pub(settings); loadMapFile(); render();
+  fixMap(); globalThis.__lobbySettings = pub(settings); loadMapFile(); render();
 }).catch(() => loadMapFile());
 fetch(new URL('../data/menu.json', import.meta.url)).then(r => r.json()).then(m => {
   M = m; const L = m.lobbySettings;
@@ -211,6 +238,7 @@ function render() {
     else { const w = el('div', 'hl-wait', 'Venter på host…'); w.id = 'lobby-wait'; menu.append(w); }
   }
   mi('KLASSE', 'lobby-class', () => { panel = 'class'; render(); });
+  mi('TILSTAND', 'lobby-mode', () => { panel = 'mode'; render(); });
   mi('INDSTILLINGER', 'lobby-settings', () => { panel = 'settings'; render(); });
   const mkShare = (c) => { const b = el('button', c, navigator.share ? 'DEL LINK' : 'KOPIÉR LINK');
     b.onclick = async () => {
@@ -236,8 +264,9 @@ function render() {
     status === 'error' ? 'Netværksfejl: ' + error : mode === 'local' ? 'Kamp mod robotter · ' + DIFF[settings.botDifficulty] : mode === 'client' ? (status === 'open' ? 'Forbundet – venter på at host starter' : 'Forbinder til ' + code + '…') : status === 'open' ? 'Klar – venner kan nu deltage med koden' : 'Opretter spil…');
   s.id = 'lobby-status';
   const t = settings.teamSize;
-  const tt = el('div', 'hl-title', MODES[(qs.get('mode') || '').toLowerCase()] || 'HOLDKAMP'); tt.id = 'lobby-title';
-  tt.append(el('small', '', ` · ${t} MOD ${t} · FØRST TIL ${settings.roundsToWin}`));
+  const gm = modeInfo(), ko = gm.id === 'knockout';
+  const tt = el('div', 'hl-title', ko ? (MODES[(qs.get('mode') || '').toLowerCase()] || 'HOLDKAMP') : gm.name.toUpperCase()); tt.id = 'lobby-title';
+  tt.append(el('small', '', ` · ${t} MOD ${t} · FØRST TIL ${ko || !gm.scoreTarget ? settings.roundsToWin : gm.scoreTarget}`));
   L.append(tt, menu, card, s);
 
   const list = previewRoster();
@@ -271,14 +300,27 @@ function modal() {
     box.append(qr, col); m.append(box); return m;
   }
   if (panel === 'map' && !(editable() && MAPS)) { panel = null; return el('div'); }
-  const box = el('div', 'hl-mbox wide' + (panel === 'map' ? ' maps' : '')); box.id = { class: 'lobby-class-panel', map: 'lobby-map-panel' }[panel] || 'lobby-settings-panel';
+  const box = el('div', 'hl-mbox wide' + (panel === 'map' || panel === 'mode' ? ' maps' : '')); box.id = { class: 'lobby-class-panel', map: 'lobby-map-panel', mode: 'lobby-mode-panel' }[panel] || 'lobby-settings-panel';
   const head = el('div', 'hl-mhead');
-  head.append(el('span', '', panel === 'class' ? 'VÆLG KLASSE' : panel === 'map' ? 'VÆLG BANE' : 'INDSTILLINGER' + (editable() ? '' : started ? ' · KAN ÆNDRES I LOBBYEN' : ' · KUN HOST')), close);
+  head.append(el('span', '', panel === 'class' ? 'VÆLG KLASSE' : panel === 'map' ? 'VÆLG BANE · ' + modeInfo().name.toUpperCase() : panel === 'mode' ? 'TILSTAND' + (editable() ? '' : started ? ' · KAN ÆNDRES I LOBBYEN' : ' · KUN HOST') : 'INDSTILLINGER' + (editable() ? '' : started ? ' · KAN ÆNDRES I LOBBYEN' : ' · KUN HOST')), close);
   box.append(head);
+  if (panel === 'mode') {
+    const list = el('div', 'hl-modes' + (editable() ? '' : ' ro'));
+    for (const g of GMODES) {
+      const c = el('button', 'hl-md' + (g.id === settings.mode ? ' sel' : '')); c.dataset.mode = g.id;
+      const nv = validMaps(g.id).length;
+      c.append(el('b', '', g.name.toUpperCase()), el('span', '', g.desc), el('i', '', (g.id === 'knockout' ? `Først til ${settings.roundsToWin} runder` : `Først til ${g.scoreTarget}`) + (MAPS ? ` · ${nv || 'alle'} baner` : '')));
+      c.onclick = () => { if (!editable()) return; panel = null; const mp = mapFor(g.id); setSettings(mp ? { mode: g.id, map: mp } : { mode: g.id }); };
+      list.append(c);
+    }
+    box.append(list); m.append(box); return m;
+  }
   if (panel === 'map') {
-    const list = el('div', 'hl-maps'), order = ['small', 'medium', 'large'];
+    const list = el('div', 'hl-maps'), order = SIZES;
+    const vm = validMaps(), pool = vm.length ? vm : MAPS.maps;
+    if (!vm.length) { const n = el('div', 'hl-mgl', `Ingen baner er lavet til ${modeInfo().name} endnu – alle vises`); n.id = 'lobby-map-note'; list.append(n); }
     for (const sz of order) {
-      const ms = MAPS.maps.filter(m => m.size === sz).sort((a, b) => a.width * a.height - b.width * b.height); if (!ms.length) continue;
+      const ms = pool.filter(m => m.size === sz).sort((a, b) => a.width * a.height - b.width * b.height); if (!ms.length) continue;
       const row = el('div', 'hl-mrow');
       for (const m of ms) {
         const c = el('button', 'hl-mc' + (m.id === settings.map ? ' sel' : '')); c.dataset.map = m.id;
