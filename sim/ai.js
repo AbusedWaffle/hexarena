@@ -171,6 +171,7 @@ export function createAI(w, cfg, seed = 1) {
     if (b.state === 'cover' && b.coverTile) return b.coverTile;
     if (b.state === 'approach' && b.target) return tileOf(b.target);
     if (b.state === 'hold') {
+      const og = objGoal(b, p); if (og) return og;
       if (b.role === 'support') return supportPost(b, p);
       // Ingen kontakt i et stykke tid: skub frem ad egen lane mod fjendens side (ikke direkte mod en spiller)
       const quiet = w.tick * DT - b.lastIntelAt, pa = b.diff.pushAfterSec ?? 15;
@@ -188,6 +189,27 @@ export function createAI(w, cfg, seed = 1) {
     }
     return g;
   }
+  // ---------- Spiltilstande: zoner (dom/hp/hq) og mærke-brikker (kc) ----------
+  const objMode = () => ['dom', 'hp', 'hq'].includes(w.match.mode);
+  const zoneTile = (b, z) => { const i = b.slot % (z.w * z.h), t = { x: z.x + (i % z.w), y: z.y + Math.floor(i / z.w) }; return freeTile(t.x, t.y) ? t : postNear(z.x + z.w / 2, z.y + z.h / 2, false); };
+  const zoneC = (z) => ({ x: (z.x + z.w / 2) * U, y: (z.y + z.h / 2) * U });
+  function pickZone(b, p) { // Domination: fordel holdet over zonerne; ejede zoner kræver færre, nær og "sin egen" zone foretrækkes
+    const Z = w.match.objectives || [], now = w.tick * DT; if (!Z.length) return null;
+    if (b.objId && now < (b.objUntil || 0)) { const z = Z.find(q => q.id === b.objId); if (z) return z; }
+    const cnt = {}; for (const o of bots.values()) if (o !== b && o.objId && P(o.id)?.alive && P(o.id).team === p.team) cnt[o.objId] = (cnt[o.objId] || 0) + 1;
+    let best = null; for (const z of Z) { const ours = z.owner === p.team && z.cap >= 1;
+      const sc = dist(p, zoneC(z)) / U + (cnt[z.id] || 0) * (ours ? 14 : 6) + (ours ? 10 : 0) + (z.id === b.objId ? -3 : 0) + (b.slot % 3 === Z.indexOf(z) ? -2 : 0);
+      if (!best || sc < best.sc) best = { z, sc }; }
+    b.objId = best.z.id; b.objUntil = now + 4; return best.z;
+  }
+  function objZone(b, p) { const m = w.match; if (!objMode()) return (b.objZ = null); if (m.mode === 'dom') return (b.objZ = pickZone(b, p)); const Z = m.objectives || []; return (b.objZ = Z.length ? Z[m.active % Z.length] : null); }
+  function objGoal(b, p) {
+    const m = w.match;
+    if (m.mode === 'kc') { const t = nearest(p, (m.tags || []).filter(t => dist(p, t) <= (cfg.tagSeekTiles ?? 14) * U)); return t ? tileOf(t) : null; }
+    const z = objZone(b, p); if (!z) return null;
+    if (b.role === 'sniper') { const c = zoneC(z), d = towardCenter(p.team); return postNear(c.x / U - d * (cfg.sniperZoneOffset ?? 6), c.y / U); } // Sniper dækker zonen på afstand
+    return zoneTile(b, z);
+  }
   const prof = (p) => (cfg.classes && cfg.classes[p.cls]) || {};
   const nearest = (p, list) => list.reduce((a, e) => (!a || dist(p, e) < dist(p, a) ? e : a), null);
 
@@ -202,6 +224,7 @@ export function createAI(w, cfg, seed = 1) {
       hunt = ag === 0 ? nearPost : (alive(p.team) >= alive(p.team === 'blue' ? 'red' : 'blue') || nearPost);
       if (hunt && b.huntId !== b.mem.id && hunters(p.team, b.mem.id, b) >= (cfg.maxBotsPerTarget ?? 2)) hunt = false;
     }
+    if (hunt && objMode()) { const z = objZone(b, p); if (z && dist(zoneC(z), b.mem) > (cfg.objDefendTiles ?? 8) * U && dist(p, b.mem) > 6 * U) hunt = false; } // i zone-tilstande: jag kun nær zonen
     const prevHunt = b.huntId; b.huntId = hunt ? b.mem.id : null;
     if (hunt && prevHunt !== b.huntId) { // Hard: to bots på samme mål angriber fra hver sin side
       const partner = huntPartner(p.team, b.huntId, b);
@@ -265,6 +288,8 @@ export function createAI(w, cfg, seed = 1) {
       const probe = { x: p.x + norm(mv).x * U, y: p.y + norm(mv).y * U }, pt = w.tiles.get(key(Math.floor(probe.x / U), Math.floor(probe.y / U)));
       if (!pt || isBlocking(pt)) { b.strafe *= -1; b.strafeUntil = now + (cfg.strafeMinSec ?? 0.8); mv = { x: to.x * radial, y: to.y * radial }; }
       f.move = norm(mv); if (!mv.x && !mv.y) f.move = { x: 0, y: 0 };
+      // Zone-tilstande: kæmp fra zonen; træk mod zonen, hvis kampen har trukket botten ud
+      if (objMode() && b.role !== 'sniper' && b.objZ) { const zc = zoneC(b.objZ), dz = dist(p, zc); if (dz > (b.objZ.w / 2 + 0.5) * U) { const tz = norm({ x: zc.x - p.x, y: zc.y - p.y }), k = Math.min(1, dz / (4 * U)) * (cfg.zonePull ?? 0.8); f.move = norm({ x: f.move.x * (1 - k) + tz.x * k, y: f.move.y * (1 - k) + tz.y * k }); } }
       // Sigte: lead på projektiler + sigtefejl
       let ax = t.x, ay = t.y;
       const prev = b.prevT && b.prevT.id === t.id ? b.prevT : null;
@@ -364,7 +389,7 @@ export function createAI(w, cfg, seed = 1) {
     const out = {};
     for (const b of bots.values()) {
       const p = w.players.find(q => q.id === b.id); if (!p) continue;
-      if (!p.alive) { b.state = 'hold'; b.path = []; b.target = null; b.mem = null; b.huntId = null; continue; }
+      if (!p.alive) { b.objId = null; b.state = 'hold'; b.path = []; b.target = null; b.mem = null; b.huntId = null; continue; }
       if ((w.tick + b.slot) % thinkEvery === 0) think(b, p);
       out[b.id] = act(b, p);
     }
