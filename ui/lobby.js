@@ -404,7 +404,7 @@ const lobbyEntry = () => {
 };
 async function syncPublish() {
   const want = !!lobbyEntry();
-  if (want && !publishing) { publishing = true; LL ||= (await import('../net/lobbyList.js')).createLobbyList({ backend: 'fake' }); LL.startHeartbeat(lobbyEntry); }
+  if (want && !publishing) { publishing = true; LL ||= (await import('../net/lobbyList.js')).createLobbyList(); LL.startHeartbeat(lobbyEntry); }
   else if (want && LL) LL.publish(lobbyEntry()); // ændrede indstillinger/spillere vises med det samme
   else if (!want && publishing) { publishing = false; LL?.stop(); LL?.remove(code); }
 }

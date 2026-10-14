@@ -54,7 +54,7 @@ async function showMenu() {
   async function openGames() {
     const [{ createLobbyList }, modes, maps] = await Promise.all([import('../net/lobbyList.js'),
       fetch('data/modes.json').then(r => r.json()).catch(() => ({})), fetch('data/maps.json').then(r => r.json()).catch(() => ({}))]);
-    const LL = createLobbyList({ backend: 'fake' });
+    const LL = createLobbyList();
     const mName = (id) => (modes.modes || []).find(m => m.id === id)?.name || id;
     const bName = (id) => (maps.maps || []).find(m => m.id === id)?.name || id;
     screen(`<div class="hm-ol" id="open-games">
