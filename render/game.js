@@ -13,6 +13,8 @@ import { createPeerHost, createPeerClient, createBcHost, createBcClient, makeCod
 import { createHostSession, createClientSession } from '../net/session.js';
 
 const [MAPS, classes, aiCfg] = await Promise.all(['data/maps.json', 'data/classes.square.json', 'data/ai.json'].map(u => fetch(u).then(r => r.json())));
+// data/modes.json (Game Designer): regler pr. tilstand flettes ind over MODE_DEFAULTS i sim (scoreTarget, timeSec, respawnSec, respawnSecByClass, scoutTagDash, …)
+{ const md = await fetch('data/modes.json').then(r => r.json()).catch(() => null); if (md?.modes) classes._match.modesData = Object.fromEntries(md.modes.map(x => [x.id, Object.fromEntries(Object.entries(x).filter(([, v]) => v != null))])); }
 // Baner: data/maps.json (Game Designer). Valgt bane = lobbySettings.map; ?map=<id> virker også uden lobby.
 const mapCache = new Map(), mapInfo = (id) => MAPS.maps.find(m => m.id === id);
 const loadMap = (id) => { const i = mapInfo(id) || mapInfo(MAPS.default); if (!mapCache.has(i.id)) mapCache.set(i.id, fetch(i.file).then(r => r.json()).then(m => ({ ...m, id: i.id }))); return mapCache.get(i.id); };

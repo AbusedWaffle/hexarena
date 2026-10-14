@@ -7,7 +7,7 @@ export const MODE_IDS = ['tdm', 'knockout', 'kc', 'dom', 'hp', 'hq']; // indeks 
 export const MODE_DEFAULTS = {
   knockout: {},
   tdm: { scoreTarget: 30, timeSec: 480, respawnSec: 3 },
-  kc: { scoreTarget: 30, timeSec: 480, respawnSec: 3, tagLifeSec: 30 },
+  kc: { scoreTarget: 30, timeSec: 480, respawnSec: 3, tagLifeSec: 30 }, // scoutTagDash / respawnSecByClass kommer fra data/modes.json
   dom: { scoreTarget: 200, timeSec: 600, respawnSec: 3, capSec: 5 },
   hp: { scoreTarget: 150, timeSec: 600, respawnSec: 3, capSec: 0, rotateSec: 60 },
   hq: { scoreTarget: 200, timeSec: 600, respawnSec: 3, capSec: 6, moveDelaySec: 5 },
@@ -83,6 +83,17 @@ export function onKillMode(w, victim, killerTeam) {
   const m = w.match;
   if (m.mode === 'tdm') m.score[killerTeam]++;
   else if (m.mode === 'kc') m.tags.push({ id: m.tagSeq++, x: victim.x, y: victim.y, team: victim.team, left: m.cfg.tagLifeSec ?? 30 });
+}
+// Kill Confirmed + scoutTagDash: Scout's dash samler brikker på hele strækningen (score/nægt som ved almindelig opsamling)
+export function dashTags(w, p, from) {
+  const m = w.match; if (m.mode !== 'kc' || !m.cfg?.scoutTagDash || p.cls !== 'Scout' || !m.tags.length) return;
+  const dx = p.x - from.x, dy = p.y - from.y, L2 = dx * dx + dy * dy || 1, r = p.radius + U * 0.45;
+  m.tags = m.tags.filter(t => {
+    const u = Math.max(0, Math.min(1, ((t.x - from.x) * dx + (t.y - from.y) * dy) / L2));
+    if (Math.hypot(from.x + dx * u - t.x, from.y + dy * u - t.y) > r) return true;
+    if (p.team !== t.team) m.score[p.team]++;
+    w.events.push({ type: 'tag', id: p.id, team: p.team, confirmed: p.team !== t.team, dash: true, x: t.x, y: t.y, score: { ...m.score } }); return false;
+  });
 }
 export const respawnBlocked = (w, p) => w.match.respawnBlocked === p.team;
 export { other };

@@ -1,5 +1,5 @@
 // Ren simulation (ingen Phaser). Hosten kalder step(world, inputs) 20 gange i sekundet.
-import { MODE_DEFAULTS, initMode, stepMode, onKillMode, respawnBlocked } from './modes.js';
+import { MODE_DEFAULTS, initMode, stepMode, onKillMode, respawnBlocked, dashTags } from './modes.js';
 import { TILE_PX, DIRS4, DIRS8, key, tileToPixel, pixelToTile } from './grid.js';
 const U = TILE_PX; // 1 tile i px
 export const TICK_HZ = 20, DT = 1 / TICK_HZ;
@@ -30,7 +30,7 @@ export function createWorld(map, classes) {
 function newMatch(m) {
   if (m.mode === 'knockout') return { mode: 'knockout', score: { blue: 0, red: 0 }, round: 1, roundIntroLeft: m.roundIntroSec ?? 3, timeLeft: m.roundTimeSec ?? 75, roundEndLeft: 0, over: false };
   // respawn-tilstande (tdm, kc, dom, hp, hq): regler fra MODE_DEFAULTS, overskrevet af _match (lobby: scoreTarget, durationSec, respawnSec, …)
-  const mode = MODE_DEFAULTS[m.mode] ? m.mode : 'tdm', cfg = { ...MODE_DEFAULTS[mode], ...(m.modeCfg || {}) };
+  const mode = MODE_DEFAULTS[m.mode] ? m.mode : 'tdm', cfg = { ...MODE_DEFAULTS[mode], ...(m.modesData?.[mode] || {}), ...(m.modeCfg || {}) }; // indbygget < data/modes.json < lobby
   if (m.modeCfg?.timeSec == null && mode === 'tdm' && m.durationSec && !m.modeCfg) cfg.timeSec = m.durationSec;
   if (mode === 'tdm' && !m.modeCfg && m.killTarget) cfg.scoreTarget = m.killTarget;
   return { mode, cfg, score: { blue: 0, red: 0 }, round: 1, roundIntroLeft: 0, timeLeft: cfg.timeSec, roundEndLeft: 0, over: false, target: cfg.scoreTarget };
@@ -212,14 +212,14 @@ function applyHit(w, ownerId, hit, damage, extra = {}) {
   if (hit.entityId) damagePlayer(w, ownerId, w.players.find(q => q.id === hit.entityId), damage, extra);
   else if (hit.tile && hit.tile.type === 'crate') damageCrate(w, w.tiles.get(key(hit.tile.x, hit.tile.y)), damage);
 }
-function damagePlayer(w, ownerId, t, damage, extra = {}) {
+export function damagePlayer(w, ownerId, t, damage, extra = {}) {
   if (!t || !t.alive || t.spawnShieldLeft > 0 || t.invulnLeft > 0) return;
   damage = Math.round(damage);
   t.hp = Math.max(0, t.hp - damage); t.lastDamageAt = w.tick * DT;
   w.events.push({ type: 'hit', id: t.id, by: ownerId, damage, x: t.x, y: t.y, hp: t.hp, ...extra });
   if (t.hp <= 0) {
     const ko = w.match.mode === 'knockout';
-    t.alive = false; t.deaths++; t.respawnLeft = ko && !w.classes._match.respawnInRound ? Infinity : (w.match.cfg?.respawnSec ?? w.classes._match.respawnSec);
+    t.alive = false; t.deaths++; t.respawnLeft = ko && !w.classes._match.respawnInRound ? Infinity : (w.match.cfg?.respawnSecByClass?.[t.cls] ?? w.match.cfg?.respawnSec ?? w.classes._match.respawnSec);
     const k = w.players.find(q => q.id === ownerId); if (k && k.team !== t.team) k.kills++;
     if (!ko) onKillMode(w, t, k && k.team !== t.team ? k.team : (t.team === 'blue' ? 'red' : 'blue'));
     w.events.push({ type: 'kill', id: t.id, by: ownerId, x: t.x, y: t.y, score: { ...w.match.score } });
@@ -266,7 +266,7 @@ function useAbility(w, p, inp) {
       const steps = Math.ceil(ab.distance * U / (p.radius * 0.5));
       for (let i = 0; i < steps; i++) { p.x += n.x * ab.distance * U / steps; p.y += n.y * ab.distance * U / steps; resolveCollision(w, p); }
       p.invulnLeft = ab.invulnSec;
-      w.events.push({ type: 'dash', id: p.id, from, to: { x: p.x, y: p.y } }); return true;
+      w.events.push({ type: 'dash', id: p.id, from, to: { x: p.x, y: p.y } }); dashTags(w, p, from); return true;
     }
     case 'deploy_crate': {
       const n = norm(inp.aim || p.aim), cx = p.x + n.x * (p.radius + (ab.placeRange - 0.5) * U + U * 0.5), cy = p.y + n.y * (p.radius + (ab.placeRange - 0.5) * U + U * 0.5);

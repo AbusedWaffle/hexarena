@@ -51,6 +51,15 @@ const run = (w, sec, f) => { for (let i = 0; i < sec * 20; i++) { f?.(); step(w,
   const b = w.players.filter(p => p.team === 'blue'); kill(w, b[0]); b[0].respawnLeft = 3; run(w, 5, () => { for (const p of w.players) if (p.alive) { p.x = -999; p.y = -999; } }); ok(!b[0].alive, 'hq: blå respawner ikke');
   for (const p of b) { kill(w, p); p.respawnLeft = 3; } run(w, 0.2, () => away(w)); ok(!z.owner && !w.match.respawnBlocked, 'hq: falder når holdet er ude');
   run(w, 3, () => away(w)); ok(w.match.active === 1, 'hq: flytter'); ok(b.every(p => p.alive), 'hq: respawn igen efter fald'); }
+// data/modes.json flettes ind; respawnSecByClass; scoutTagDash
+{ const md = rd('modes.json'); const classes = rd('classes.square.json'); const map = rd('map_paintyard_sq_01.json');
+  classes._match.mode = 'kc'; classes._match.modesData = { kc: { ...md.modes.find(x => x.id === 'kc'), respawnSecByClass: { Scout: 2 }, scoutTagDash: true } };
+  const w = createWorld(map, classes); const s = addPlayer(w, { team: 'blue', cls: 'Scout' }), r = addPlayer(w, { team: 'red', cls: 'Assault' }); startMatch(w);
+  const { damagePlayer } = await import('../sim/world.js'); const { onKillMode, dashTags } = await import('../sim/modes.js');
+  ok(w.match.target === md.modes.find(x => x.id === 'kc').scoreTarget, 'modes.json: scoreTarget');
+  if (damagePlayer) { s.invulnLeft = 0; s.spawnShieldLeft = 0; damagePlayer(w, r.id, s, 9999); ok(Math.abs(s.respawnLeft - 2) < 0.01, `respawnSecByClass: Scout ${s.respawnLeft}`); }
+  w.match.tags = [{ id: 99, x: 300, y: 100, team: 'red', left: 30 }]; s.alive = true; const from = { x: 100, y: 100 }; s.x = 500; s.y = 100; dashTags(w, s, from);
+  ok(!w.match.tags.length && w.match.score.blue === 1, 'scoutTagDash: brik samlet på strækningen'); }
 // Bot-kampe til slut + codec på alle tilstande og baner
 for (const mode of ['tdm', 'kc', 'dom', 'hp', 'hq']) for (const mi of maps.maps ?? maps) {
   const { w, ai, map } = mk(mode, mi.file.split('/').pop(), { timeSec: 40 }); let maxB = 0, ticks = 0;
