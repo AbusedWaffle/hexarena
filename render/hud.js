@@ -5,7 +5,7 @@ import { INPUT } from './inputSystem.js';
 import { hasLineOfSight } from '../sim/world.js';
 
 const hexStr = (c) => '#' + c.toString(16).padStart(6, '0');
-export const HUD = { mini: { tile: 5, margin: 16 }, arrow: { inset: 26, size: 11 } };
+export const HUD = { mini: { tile: 5, margin: 16 } /* tile skaleres ned på store baner (max 150×100 px) */, arrow: { inset: 26, size: 11 } };
 
 export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
   const g = scene.add.graphics().setDepth(20);
@@ -15,10 +15,14 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
   const clock = scene.add.text(640, 18, '', { fontFamily: font, fontSize: 26, color: hexStr(PALETTE.score) }).setOrigin(0.5, 0).setDepth(21);
   const center = scene.add.text(640, 300, '', { fontFamily: font, fontSize: 40, color: hexStr(PALETTE.text), align: 'center', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(21);
   const abilTxt = scene.add.text(INPUT.abilityBtn.x, INPUT.abilityBtn.y, '', { fontFamily: font, fontSize: 22, color: hexStr(PALETTE.text) }).setOrigin(0.5).setDepth(21);
+  // tilstande med mål (tdm/kc/dom/hp/hq): status-chips for zoner, Hardpoint-nedtælling, 'respawn slået fra'
+  const objTxt = [], objLabel = (i) => objTxt[i] ??= (() => { const t = scene.add.text(0, 0, '', { fontFamily: font, fontSize: 13, fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(21); layer.add(t); return t; })();
+  const modeTxt = scene.add.text(640, 102, '', { fontFamily: font, fontSize: 16, color: hexStr(PALETTE.text), stroke: '#000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(21);
+  const blockTxt = scene.add.text(640, 120, '', { fontFamily: font, fontSize: 16, fontStyle: 'bold', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(21);
   for (const t of [scoreB, scoreR, clock]) t.setShadow(0, 0, '#000', 6, false, true);
   // Alt HUD ligger i én container, der modvirker kameraets zoom, så HUD'en altid er i skærmkoordinater (1280×720)
   // uanset hvor meget kameraet zoomer. Skærm s vises når container-position = c - c/z og skala = 1/z (c = skærmens midte).
-  const layer = scene.add.container(0, 0, [g, scoreB, scoreR, clock, center, abilTxt]).setScrollFactor(0).setDepth(20);
+  const layer = scene.add.container(0, 0, [g, scoreB, scoreR, clock, center, abilTxt, modeTxt, blockTxt]).setScrollFactor(0).setDepth(20);
   const fitLayer = () => { const z = scene.cameras.main.zoom; layer.setScale(1 / z).setPosition(640 - 640 / z, 360 - 360 / z); };
   const toScreen = (wx, wy) => { const c = scene.cameras.main, v = c.worldView; return { x: (wx - v.x) * c.zoom, y: (wy - v.y) * c.zoom }; };
   const M = HUD.mini; let mw, mh, mx0, my0; // følger world.map, så baneskift i lobbyen også skifter minikort
@@ -36,6 +40,8 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
     // læg et ekstra objekt (fx hjælpetekst) i HUD-laget
     add(obj) { layer.add(obj); return obj; },
     toScreen,
+    // til tests: synlige tilstandstekster
+    modeTexts: () => ({ mode: modeTxt.text, block: blockTxt.text, labels: objTxt.filter(Boolean).map(t => t.text).filter(Boolean) }),
     draw(snap) {
       fitLayer(); g.clear();
       const me = snap.players.find(p => p.id === meId), m = snap.match, cam = scene.cameras.main, v = cam.worldView;
@@ -57,7 +63,42 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
         }
       }
 
-      map = world.map; mw = map.width * M.tile; mh = map.height * M.tile; mx0 = 1280 - M.margin - mw; my0 = M.margin;
+      // mål-tilstande: blå/rød scorebjælke mod målet, objektiv-chips (ejerfarve + indtagelse), HP-nedtælling, respawn slået fra
+      const objs = snap.objectives || [], tcol = (t) => t === 'blue' ? PALETTE.blue : t === 'red' ? PALETTE.red : 0x8A93B0;
+      objTxt.forEach(t => t.setText('')); modeTxt.setText(''); blockTxt.setText('');
+      if (!knockout && m.target) {
+        const W = 96, fb = Math.min(1, m.score.blue / m.target), fr = Math.min(1, m.score.red / m.target);
+        g.fillStyle(0x000000, 0.5).fillRect(640 - W - 2, 58, W * 2 + 4, 10);
+        g.fillStyle(PALETTE.blue, 0.95).fillRect(638 - W * fb, 59, W * fb, 8).fillStyle(PALETTE.red, 0.95).fillRect(642, 59, W * fr, 8);
+        g.lineStyle(1, PALETTE.score, 0.8).lineBetween(640, 57, 640, 69);
+        const tt = objLabel(99); tt.setFontSize(11).setColor(hexStr(PALETTE.score)).setPosition(640 + W + 22, 63).setText(String(m.target));
+      }
+      if (objs.length) {
+        const shown = m.mode === 'hq' ? objs.filter(z => z.active !== false) : objs; const n = shown.length, S = 26, gap = 6, x0 = 640 - (n * S + (n - 1) * gap) / 2;
+        shown.forEach((z, i) => {
+          const x = x0 + i * (S + gap), y = 72, a = z.active === false ? 0.35 : 1, c = tcol(z.owner);
+          g.fillStyle(0x000000, 0.5 * a).fillRect(x, y, S, S).fillStyle(c, (z.owner ? 0.85 : 0.25) * a).fillRect(x, y, S, S);
+          if (z.capTeam && z.capTeam !== z.owner && z.cap > 0) g.fillStyle(tcol(z.capTeam), 0.9 * a).fillRect(x, y + S * (1 - z.cap), S, S * z.cap * 0.25 + 0.01).fillRect(x, y + S - 3, S * z.cap, 3);
+          g.lineStyle(z.active === false ? 1 : 2, z.active === false ? 0x8A93B0 : 0xffffff, 0.8 * a).strokeRect(x, y, S, S);
+          objLabel(i).setFontSize(15).setColor('#ffffff').setAlpha(a).setPosition(x + S / 2, y + S / 2).setText(m.mode === 'hq' ? 'HQ' : m.mode === 'hp' ? (z.active ? '◆' : '') : String(z.id));
+        });
+        if (m.mode === 'hp' && m.zoneSwapLeft > 0) { const sec = Math.ceil(m.zoneSwapLeft); modeTxt.setY(102).setText(`ZONEN FLYTTER OM ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`); }
+      }
+      if (m.respawnBlocked) blockTxt.setY(objs.length ? (modeTxt.text ? 120 : 102) : 74).setColor(hexStr(m.respawnBlocked === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow))
+        .setText((m.respawnBlocked === me.team ? 'DIT HOLD: ' : 'FJENDEN: ') + 'RESPAWN SLÅET FRA');
+      // pile ved skærmkanten mod aktive mål uden for skærmen (holdt under score-området)
+      for (const z of objs) {
+        if (z.active === false) continue;
+        const wx = (z.x + z.w / 2) * TILE_PX, wy = (z.y + z.h / 2) * TILE_PX; if (v.contains(wx, wy)) continue;
+        const { x: sx, y: sy } = toScreen(wx, wy), dx = sx - 640, dy = sy - 360, I = 34;
+        const k = Math.min((640 - I) / Math.abs(dx || 1e-6), (360 - I) / Math.abs(dy || 1e-6));
+        const ax = 640 + dx * k, ay = Math.max(150, 360 + dy * k), an = Math.atan2(dy, dx), s = 13;
+        g.fillStyle(0x000000, 0.55).fillCircle(ax, ay, 15).lineStyle(2, tcol(z.owner), 1).strokeCircle(ax, ay, 15)
+          .fillStyle(tcol(z.owner === me.team ? z.owner : z.owner || null), 0.95).fillTriangle(ax + Math.cos(an) * (s + 10), ay + Math.sin(an) * (s + 10), ax + Math.cos(an + 0.5) * 16, ay + Math.sin(an + 0.5) * 16, ax + Math.cos(an - 0.5) * 16, ay + Math.sin(an - 0.5) * 16);
+        objLabel(50 + objs.indexOf(z)).setFontSize(12).setColor('#ffffff').setAlpha(1).setPosition(ax, ay).setText(m.mode === 'hq' ? 'HQ' : m.mode === 'hp' ? '◆' : String(z.id));
+      }
+
+      map = world.map; M.tile = Math.min(5, 150 / map.width, 100 / map.height); mw = map.width * M.tile; mh = map.height * M.tile; mx0 = 1280 - M.margin - mw; my0 = M.margin;
       // minikort: vægge, kasser, spawn-zoner, egne folk; fjender kun med synslinje
       g.fillStyle(PALETTE.bg, 0.8).fillRect(mx0 - 3, my0 - 3, mw + 6, mh + 6).lineStyle(1, PALETTE.wallEdge, 0.8).strokeRect(mx0 - 3, my0 - 3, mw + 6, mh + 6);
       if (map.spawnZones) for (const [team, z] of Object.entries(map.spawnZones)) g.fillStyle(team === 'blue' ? PALETTE.blue : PALETTE.red, 0.18).fillRect(mx0 + z.x0 * M.tile, my0, (z.x1 - z.x0 + 1) * M.tile, mh);
@@ -69,6 +110,11 @@ export function createHud(scene, { map, classes, world, input, meId = 'me' }) {
         const px = mx0 + p.x / TILE_PX * M.tile, py = my0 + p.y / TILE_PX * M.tile;
         g.fillStyle(p.team === 'blue' ? PALETTE.blueGlow : PALETTE.redGlow, 1).fillCircle(px, py, p.id === meId ? 3.5 : 2.5);
         if (p.id === meId) g.lineStyle(1, 0xffffff, 1).strokeCircle(px, py, 5);
+      }
+      for (const z of objs) { // mål på minikortet
+        const a = z.active === false ? 0.35 : 0.9;
+        g.fillStyle(tcol(z.owner), z.owner ? 0.55 * a : 0.25 * a).fillRect(mx0 + z.x * M.tile, my0 + z.y * M.tile, z.w * M.tile, z.h * M.tile)
+          .lineStyle(1, z.active === false ? 0x8A93B0 : 0xffffff, a).strokeRect(mx0 + z.x * M.tile, my0 + z.y * M.tile, z.w * M.tile, z.h * M.tile);
       }
       g.lineStyle(1, 0xffffff, 0.35).strokeRect(mx0 + v.x / TILE_PX * M.tile, my0 + v.y / TILE_PX * M.tile, v.width / TILE_PX * M.tile, v.height / TILE_PX * M.tile);
 

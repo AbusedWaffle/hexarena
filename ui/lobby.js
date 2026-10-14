@@ -98,7 +98,7 @@ const persist = (patch) => { const o = { ...load(), ...patch }; localStorage.set
 let saved = load();
 let mode = qs.has('host') ? 'host' : qs.has('room') ? 'client' : 'local';
 let cls = qs.get('cls') || saved.cls || 'Assault';
-let settings = normalize({ ...DEF, ...(saved.lobbySettings || {}), ...(saved.difficulty && !saved.lobbySettings ? { botDifficulty: saved.difficulty } : {}), ...(saved.teamSize && !saved.lobbySettings ? { teamSize: Math.min(4, saved.teamSize) } : {}) });
+let settings = normalize({ ...DEF, ...(saved.lobbySettings || {}), ...(['knockout', 'tdm', 'kc', 'dom', 'hp', 'hq'].includes(qs.get('mode')) ? { mode: qs.get('mode') } : {}), ...(qs.get('map') ? { map: qs.get('map') } : {}), ...(saved.difficulty && !saved.lobbySettings ? { botDifficulty: saved.difficulty } : {}), ...(saved.teamSize && !saved.lobbySettings ? { teamSize: Math.min(4, saved.teamSize) } : {}) });
 let started = false, panel = null, code = mode === 'client' ? qs.get('room') : null, roster = null, status = mode === 'local' ? 'open' : 'connecting', error = '', open = true, map = null, M = null;
 let active = mode !== 'local' || qs.get('lobby') === '1'; // lokalt spil viser kun lobbyen med ?lobby=1 (som game.js venter på)
 // Udadtil er botCount altid et tal (antal robotter i alt); 'Fyld' sendes som 2·teamSize−1 + botFill:true.
