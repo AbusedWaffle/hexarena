@@ -114,7 +114,7 @@ class Arena extends Phaser.Scene {
   // Host/lokal: afbryd kampen og gå tilbage til lobbyen. Kampen fryses, alle respawner, indstillinger kan ændres igen; klienter får settings med started:false.
   onLobbyReset() {
     if (!this.started || !LOBBY || MODE === 'client') return;
-    this.started = false; startMatch(this.world); this.spec = null; this.emitSpec?.(null);
+    this.started = false; startMatch(this.world); this.spec = null; this.dmg?.clear(); for (const t of this.dmgTexts?.values() || []) t.destroy(); this.dmgTexts?.clear(); this.emitSpec?.(null);
     this.prev = this.cur = snapshot(this.world);
     this.lobbyEmit({ settings: this.settings, roster: this.rosterNow(), started: false });
     this.net?.sendSettings(this.settings, false); this.net?.sendRoster();
@@ -252,6 +252,7 @@ class Arena extends Phaser.Scene {
       const age = now - d.last; let txt = this.dmgTexts.get(id);
       if (age > c.holdMs + c.fadeMs) { this.dmg.delete(id); txt?.destroy(); this.dmgTexts.delete(id); continue; }
       const p = this.cur.players.find(q => q.id === id);
+      if (!p) { this.dmg.delete(id); txt?.destroy(); this.dmgTexts.delete(id); continue; } // spiller væk (bots genopbygget efter lobby-reset/indstillinger)
       if (!txt) { txt = this.add.text(0, 0, '', { font: c.font, color: hexStr(id === 'me' ? c.selfDamageColor : c.color), stroke: '#000', strokeThickness: c.strokePx }).setOrigin(0.5).setDepth(5); txt.setShadow(0, 0, hexStr(c.glowColor), c.glowBlur, false, true); this.dmgTexts.set(id, txt); }
       let size = 1; for (const [th, s] of c.sizeByTotal) if (d.total >= th) size = s;
       const pop = Math.max(0, 1 - (now - d.pop) / c.popMs) * (c.popScale - 1);
